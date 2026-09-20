@@ -22,6 +22,7 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.support.GeneratedKeyHolder
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
@@ -55,7 +56,8 @@ class LoadRunner(
         val eventId = keys.key!!.toLong()
         val cache = spec.strategies.cacheConsistency
         // REDIS_AS_SOT는 DECR이 빈 키에서 -1을 만들지 않도록 web이 N을 심는다. 다른 전략은 eventId가 새로 나와 키가 비어 있다.
-        if (cache == CacheStrategy.REDIS_AS_SOT) redis.opsForValue().set("stock:$eventId", spec.seatCount.toString())
+        // 10분 TTL은 실행이 끝난 뒤 키가 쌓이지 않게 한다.
+        if (cache == CacheStrategy.REDIS_AS_SOT) redis.opsForValue().set("stock:$eventId", spec.seatCount.toString(), Duration.ofMinutes(10))
         val targets = appUrls.take(spec.appInstances)
         // 좌석 선택: seed가 같으면 같은 좌석. picks[userId - 1] ∈ 1..N 균등.
         val rnd = Random(spec.seed)

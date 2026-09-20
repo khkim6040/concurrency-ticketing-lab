@@ -75,7 +75,7 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
                 jdbc.sql("UPDATE event SET remaining = remaining - 1 WHERE id = :id").param("id", req.eventId).update()
             } catch (e: Exception) {
                 // DB 쓰기가 실패하면 Redis 카운터를 되돌린다. 좌석 행은 reserve()가 되돌린다.
-                stock.restore(req.eventId)
+                runCatching { stock.restore(req.eventId) }.onFailure(e::addSuppressed)
                 throw e
             }
             return ReserveResponse(Outcome.OK)
