@@ -28,3 +28,13 @@
 | 2026-09-20 | DEGRADED 기준선 키에 `doubleBooking` 포함 | 좌석 NONE 경로가 sleep을 하나 더 하므로 같은 좌석 전략끼리만 비교해야 한다. |
 | 2026-09-20 | `LOCAL_LOCK`은 `synchronized`가 아니라 `ReentrantLock` | JDK 21 가상 스레드는 `synchronized` 대기 중 캐리어를 핀한다. M2 좌석 단계가 락 밖에서 DB를 쓰자 캐리어 12개가 락 대기로 묶여 커넥션 풀이 고갈됐다(앱 1대에서 오류 961건, 처리량 10 rps). `ReentrantLock` 대기는 언마운트되고 "JVM 로컬 락은 앱 2대에서 무너진다"는 교훈은 같다. |
 | 2026-09-20 | M1 결과 표는 좌석 전략 `NONE` 기준으로 재측정하고, M0의 10회 표는 제거 | 좌석 단계가 카운터 앞에 서면서 좌석을 잡은 요청만 카운터에 도달한다. `NONE` 오버셀은 900 고정이 아니라 수십~수백으로 줄고 처리량도 낮아져, 이전 수치는 더 이상 재현되지 않는다. |
+| 2026-09-20 | `REDIS_AS_SOT`는 카운터 단계를 Redis `DECR`로 바꾸고 `oversell` 전략을 무시한다. UI가 라디오를 비활성화 | "SoT가 Redis로 옮겨가면 DB 락 전략은 의미가 없다"가 교훈. write-through(DB가 결정하고 `DECR` 추가)는 축이 직교하지만 스펙의 "Redis가 SoT" 시나리오가 사라진다. |
+| 2026-09-20 | `REDIS_AS_SOT`의 DB 쓰기는 동기(`remaining - 1`). 스펙의 "비동기"는 보류 | write-behind 큐는 관측 가치가 없고 원장 검증만 어렵게 한다. |
+| 2026-09-20 | `phantomStockViews`·`staleWindowMs`는 판정에 넣지 않는다 | 어떤 전략도 0이 안 되는 지표를 FAIL 조건에 넣으면 M3부터 모든 실행이 FAIL. 학습 목표 4("stale read는 설계 선택")대로 별도 표시 + 고정 해설. |
+| 2026-09-20 | 조회 부하는 전용 조회자 상수(2개, 10ms 간격, 예매 종료 후 꼬리 2초). 파라미터로 노출하지 않음 | 예매 직전 조회 모델은 조회가 출발선에 몰려 매진 이후 조회가 없다. 꼬리 2초는 `TTL_SHORT`의 1초 만료를 창 안에 잡기 위함. |
+| 2026-09-20 | `soldOutAt` = N번째 `OK` 응답이 web에 도착한 시각 | DB가 0이 된 시점보다 약간 늦어 phantom을 적게 세는 쪽으로 보수적. DB 폴링 없이 기존 응답 처리에 한 줄. |
+| 2026-09-20 | cache-aside 미스 경로는 DB 읽기 → `sleep(raceWindowMs)` → `SET`. `REDIS_AS_SOT`의 `DECR`에는 sleep 없음 | 다른 축과 같은 read-modify-write 원칙. 이 sleep이 `INVALIDATE_ON_WRITE`의 삭제-재적재 경합을 재현시킨다. `DECR`은 원자라 `CONDITIONAL_UPDATE`와 같은 이유로 sleep이 없다. |
+| 2026-09-20 | 지표에 `staleWindowMs`(마지막 phantom − soldOutAt)와 `viewDbReads` 추가 | phantom 수는 폴링 주기에 좌우되지만 ms 창은 직관적. `viewDbReads`가 이 축의 비용 면(캐시가 DB를 얼마나 막는가). |
+| 2026-09-20 | `INVALIDATE_ON_WRITE`의 `DEL`은 `tx.execute` 반환 뒤(커밋 이후) | 커밋 전에 지우면 조회자가 커밋 전 값을 재적재하는 별개의 버그. |
+| 2026-09-20 | DEGRADED 기준선 키에 `cacheConsistency` 포함 | `INVALIDATE_ON_WRITE`는 쓰기마다 `DEL`, `REDIS_AS_SOT`는 경로가 다르므로 같은 캐시 전략끼리만 비교. |
+| 2026-09-20 | M3 DoD는 20ms 4종에 더해 `INVALIDATE_ON_WRITE`를 `raceWindowMs=200`으로 한 번 더 돌린다 | 20ms에서는 판매 100건이 조회자의 첫 SELECT가 풀 대기에서 돌아오기 전에 끝나 재적재가 대개 0을 써서 경합이 일부 실행에서만 걸린다(DoD 2/5). 200ms면 재적재가 마지막 쓰기를 가로질러 매번 걸린다. 경합은 조회 지연 대 쓰기 폭주의 성질이고 창 노브는 그것을 보이게 할 뿐이다. |
