@@ -1,5 +1,6 @@
 package lab.app
 
+import lab.CacheStrategy
 import lab.DoubleBookingStrategy
 import lab.Outcome
 import lab.OversellStrategy
@@ -15,7 +16,7 @@ import kotlin.concurrent.withLock
 
 @Service
 @Profile("app")
-class ReservationService(private val jdbc: JdbcClient, private val tx: TransactionTemplate) {
+class ReservationService(private val jdbc: JdbcClient, private val tx: TransactionTemplate, private val stock: StockCache) {
     // ponytail: 전역 락. 실행당 이벤트가 하나라 이벤트별 락과 결과가 같다.
     // synchronized가 아닌 ReentrantLock인 이유: JDK 21 가상 스레드는 synchronized 대기 중 캐리어를 핀해서
     // 락 밖의 좌석 단계까지 굶긴다(커넥션 풀 고갈). ReentrantLock 대기는 언마운트된다.
@@ -25,7 +26,7 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
     fun reserve(req: ReserveRequest): ReserveResponse {
         takeSeat(req)?.let { return ReserveResponse(it) }
         val res = try {
-            counter(req.eventId, req.strategy, req.raceWindowMs)
+            counter(req)
         } catch (e: Exception) {
             // release가 같은 이유로 실패해도 원래 예외를 유지한다. 행 누수는 doubleBookedSeats를 부풀린다.
             runCatching { release(req) }.onFailure(e::addSuppressed)
@@ -63,7 +64,20 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
         }
     }
 
-    private fun counter(eventId: Long, strategy: OversellStrategy, raceWindowMs: Long): ReserveResponse = when (strategy) {
+    // 카운터 단계. REDIS_AS_SOT는 Redis DECR이 결정하고 oversell 전략은 무시된다. DB는 뒤따라 동기로 쓴다.
+    private fun counter(req: ReserveRequest): ReserveResponse {
+        if (req.cache == CacheStrategy.REDIS_AS_SOT) {
+            if (!stock.decrement(req.eventId)) return ReserveResponse(Outcome.SOLD_OUT)
+            jdbc.sql("UPDATE event SET remaining = remaining - 1 WHERE id = :id").param("id", req.eventId).update()
+            return ReserveResponse(Outcome.OK)
+        }
+        val res = dbCounter(req.eventId, req.strategy, req.raceWindowMs)
+        // 커밋 이후에 지운다(PESSIMISTIC의 tx.execute가 반환된 뒤). 커밋 전이면 조회자가 커밋 전 값을 재적재한다.
+        if (res.result == Outcome.OK && req.cache == CacheStrategy.INVALIDATE_ON_WRITE) stock.invalidate(req.eventId)
+        return res
+    }
+
+    private fun dbCounter(eventId: Long, strategy: OversellStrategy, raceWindowMs: Long): ReserveResponse = when (strategy) {
         OversellStrategy.NONE -> readSleepWrite(eventId, raceWindowMs)
         OversellStrategy.LOCAL_LOCK -> localLock.withLock { readSleepWrite(eventId, raceWindowMs) }
         OversellStrategy.CONDITIONAL_UPDATE -> {
