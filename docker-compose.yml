@@ -13,14 +13,20 @@ services:
       interval: 2s
       retries: 30
 
+  redis:
+    image: redis:7-alpine
+
   app-1: &app
     build: .
     environment:
       SPRING_PROFILES_ACTIVE: app
       DB_URL: jdbc:mysql://mysql:3306/lab
+      REDIS_HOST: redis
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_started
 
   app-2: *app
 
@@ -29,9 +35,11 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: web
       DB_URL: jdbc:mysql://mysql:3306/lab
+      REDIS_HOST: redis
       APP_URLS: http://app-1:8080,http://app-2:8080
     ports:
       - "8080:8080"
     depends_on:
       - app-1
       - app-2
+      - redis

@@ -10,5 +10,8 @@ spring:
     password: ${DB_PASSWORD:lab}
     hikari:
       maximum-pool-size: 20
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
 lab:
   app-urls: ${APP_URLS:http://localhost:8081,http://localhost:8082}
