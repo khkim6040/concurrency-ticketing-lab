@@ -1,0 +1,37 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: lab
+      MYSQL_USER: lab
+      MYSQL_PASSWORD: lab
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 2s
+      retries: 30
+
+  app-1: &app
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: app
+      DB_URL: jdbc:mysql://mysql:3306/lab
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  app-2: *app
+
+  web:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: web
+      DB_URL: jdbc:mysql://mysql:3306/lab
+      APP_URLS: http://app-1:8080,http://app-2:8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - app-1
+      - app-2
