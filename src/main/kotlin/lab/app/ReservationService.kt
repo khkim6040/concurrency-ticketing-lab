@@ -10,11 +10,16 @@ import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 @Service
 @Profile("app")
 class ReservationService(private val jdbc: JdbcClient, private val tx: TransactionTemplate) {
-    private val localLock = Any() // ponytail: 전역 락. 실행당 이벤트가 하나라 이벤트별 락과 결과가 같다.
+    // ponytail: 전역 락. 실행당 이벤트가 하나라 이벤트별 락과 결과가 같다.
+    // synchronized가 아닌 ReentrantLock인 이유: JDK 21 가상 스레드는 synchronized 대기 중 캐리어를 핀해서
+    // 락 밖의 좌석 단계까지 굶긴다(커넥션 풀 고갈). ReentrantLock 대기는 언마운트된다.
+    private val localLock = ReentrantLock()
 
     // 좌석 먼저, 카운터 나중. 좌석을 잡은 요청만 카운터를 차감하고, 카운터가 OK가 아니면(예외 포함) 자기 행을 되돌린다.
     fun reserve(req: ReserveRequest): ReserveResponse {
@@ -59,7 +64,7 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
 
     private fun counter(eventId: Long, strategy: OversellStrategy, raceWindowMs: Long): ReserveResponse = when (strategy) {
         OversellStrategy.NONE -> readSleepWrite(eventId, raceWindowMs)
-        OversellStrategy.LOCAL_LOCK -> synchronized(localLock) { readSleepWrite(eventId, raceWindowMs) }
+        OversellStrategy.LOCAL_LOCK -> localLock.withLock { readSleepWrite(eventId, raceWindowMs) }
         OversellStrategy.CONDITIONAL_UPDATE -> {
             val updated = jdbc.sql("UPDATE event SET remaining = remaining - 1 WHERE id = :id AND remaining > 0")
                 .param("id", eventId).update()
