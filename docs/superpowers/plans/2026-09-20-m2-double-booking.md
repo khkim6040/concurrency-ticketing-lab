@@ -54,7 +54,7 @@
   - `data class PerformanceMetrics(throughput, p50Ms, p95Ms, p99Ms, errorCount, retryCount, dbConnectionPeak, duplicateKeyCount: Int)`
   - `fun buildReport(runId: String, spec: RunSpec, samples: List<Sample>, remaining: Int, elapsedMs: Long, baselineThroughput: Double? = null, doubleBookedSeats: Int = 0): RunReport`
 
-- [ ] **Step 1: 실패하는 테스트 추가**
+- [x] **Step 1: 실패하는 테스트 추가**
 
 `src/test/kotlin/lab/ReportTest.kt` 클래스 안에 아래 두 테스트를 추가한다. 기존 7개는 그대로 둔다.
 
@@ -80,12 +80,12 @@
     }
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test --tests lab.ReportTest`
 Expected: 컴파일 실패. `doubleBookedSeats`, `Outcome.DUPLICATE_KEY`, `Outcome.SEAT_TAKEN`, `duplicateKeyCount` 미정의.
 
-- [ ] **Step 3: Models.kt 교체**
+- [x] **Step 3: Models.kt 교체**
 
 `src/main/kotlin/lab/Models.kt` 전체를 아래로 교체한다.
 
@@ -200,7 +200,7 @@ fun buildReport(
 }
 ```
 
-- [ ] **Step 4: main 컴파일 오류가 예상 범위인지 확인**
+- [x] **Step 4: main 컴파일 오류가 예상 범위인지 확인**
 
 테스트 컴파일은 `main` 컴파일에 의존하는데, `ReservationService`·`LoadRunner`·`RunController`가 아직 옛 시그니처를 쓰므로 이 단계에서는 테스트를 돌릴 수 없다. 오류가 예상 범위인지만 본다.
 
@@ -209,7 +209,7 @@ Expected: 실패. 오류는 세 가지뿐이어야 한다. `RunController`의 `P
 
 테스트 통과 확인은 Task 3 Step 3에서 한다.
 
-- [ ] **Step 5: Commit 보류**
+- [x] **Step 5: Commit 보류**
 
 빌드가 깨진 상태로 커밋하지 않는다. Task 3 Step 5에서 Task 1·2·3을 커밋 하나로 묶는다.
 
@@ -226,7 +226,7 @@ Expected: 실패. 오류는 세 가지뿐이어야 한다. `RunController`의 `P
 - Consumes: Task 1의 `ReserveRequest`, `DoubleBookingStrategy`, `Outcome`
 - Produces: `ReservationService.reserve(req: ReserveRequest): ReserveResponse`. 테이블 `reservation(id, event_id, seat_no, user_id)`. 유니크 인덱스 이름 `ux_reservation_seat`는 Task 3의 web이 만들고 지운다.
 
-- [ ] **Step 1: 스키마에 테이블 추가**
+- [x] **Step 1: 스키마에 테이블 추가**
 
 `db/schema.sql` 끝에 추가한다. 유니크 인덱스는 여기 넣지 않는다.
 
@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS reservation (
 );
 ```
 
-- [ ] **Step 2: 서비스 교체**
+- [x] **Step 2: 서비스 교체**
 
 `src/main/kotlin/lab/app/ReservationService.kt` 전체를 아래로 교체한다. 카운터 단계(`counter`)는 M1의 `when` 그대로다.
 
@@ -347,7 +347,7 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
 }
 ```
 
-- [ ] **Step 3: 컨트롤러 호출 한 줄 수정**
+- [x] **Step 3: 컨트롤러 호출 한 줄 수정**
 
 `src/main/kotlin/lab/app/ReserveController.kt`에서
 
@@ -360,7 +360,7 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
 ```
 로 바꾼다.
 
-- [ ] **Step 4: 컴파일 확인**
+- [x] **Step 4: 컴파일 확인**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew compileKotlin`
 Expected: `LoadRunner.kt`(`ReserveRequest` 인자 부족)와 `RunController.kt`(`Progress()` 인자 없음)만 실패. `app` 패키지 오류는 없어야 한다.
@@ -377,7 +377,7 @@ Expected: `LoadRunner.kt`(`ReserveRequest` 인자 부족)와 `RunController.kt`(
 - Consumes: Task 1의 `Progress(seatCount)`, `ReserveRequest`, `buildReport(doubleBookedSeats)`. Task 2의 `reservation` 테이블.
 - Produces: `GET /api/runs/{id}`의 `progress.seats: number[]`(길이 N), `report.consistency.doubleBookedSeats`, `report.performance.duplicateKeyCount`. 요청 본문 `strategies.doubleBooking`(생략 시 `NONE`).
 
-- [ ] **Step 1: LoadRunner 교체**
+- [x] **Step 1: LoadRunner 교체**
 
 `src/main/kotlin/lab/web/LoadRunner.kt` 전체를 아래로 교체한다.
 
@@ -478,7 +478,7 @@ class LoadRunner(
 }
 ```
 
-- [ ] **Step 2: RunController에서 Progress 크기 지정**
+- [x] **Step 2: RunController에서 Progress 크기 지정**
 
 `src/main/kotlin/lab/web/RunController.kt`에서
 
@@ -491,12 +491,12 @@ class LoadRunner(
 ```
 로 바꾼다.
 
-- [ ] **Step 3: 빌드와 전체 테스트**
+- [x] **Step 3: 빌드와 전체 테스트**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test`
 Expected: BUILD SUCCESSFUL, `ReportTest` 9개 PASS.
 
-- [ ] **Step 4: 컨테이너 재생성 후 수동 확인**
+- [x] **Step 4: 컨테이너 재생성 후 수동 확인**
 
 스키마가 바뀌었으므로 볼륨을 지운다.
 
@@ -514,7 +514,7 @@ Expected: `doubleBookedSeats 0`, `duplicateKeyCount` 약 900, 판정 `PASS` 또�
 
 `docker compose exec mysql mysql -ulab -plab lab -e "SHOW INDEX FROM reservation"`로 두 번째 실행 뒤 `ux_reservation_seat`가 있고, `NONE`으로 한 번 더 돌린 뒤에는 없어졌는지 확인한다.
 
-- [ ] **Step 5: Commit (Task 1·2·3을 커밋 하나로)**
+- [x] **Step 5: Commit (Task 1·2·3을 커밋 하나로)**
 
 모델 변경은 app·web과 같이 가야 컴파일되므로 세 Task를 나누면 중간 커밋이 빌드를 깨뜨린다. 하나의 논리적 변경("좌석 예약 추가")으로 보고 커밋 하나로 묶는다.
 
@@ -535,7 +535,7 @@ git commit -m "feat: add seat reservations with a runtime-toggled unique index"
 **Interfaces:**
 - Consumes: Task 3의 `progress.seats`, 요청 본문 `strategies.doubleBooking`
 
-- [ ] **Step 1: index.html 수정**
+- [x] **Step 1: index.html 수정**
 
 1. `<title>` 아래 `<style>`의 `#grid i.over{background:#f80}` 다음 줄에 추가:
 ```css
@@ -563,14 +563,14 @@ function draw(n, ok, seats) {
    - `draw(body.seatCount, 0);` → `draw(body.seatCount, 0, []);`
    - 폴링 안 `draw(body.seatCount, s.progress.ok);` → `draw(body.seatCount, s.progress.ok, s.progress.seats);`
 
-- [ ] **Step 2: 브라우저 확인**
+- [x] **Step 2: 브라우저 확인**
 
 Run: `docker compose up -d --build web && sleep 15 && open http://localhost:8080`
 - `CONDITIONAL_UPDATE` + `NONE` 실행: 그리드에 빨강 칸이 여러 개, 회색 칸도 남고, 배지 FAIL. 리포트 JSON에 `doubleBookedSeats > 0`.
 - `CONDITIONAL_UPDATE` + `UNIQUE_CONSTRAINT` 실행: 빨강 없음, 거의 전부 초록, 배지 PASS(또는 DEGRADED), `duplicateKeyCount` 약 900.
 - `NONE` + `NONE` 실행: 빨강 다수 + 주황 칸 뒤에 붙음.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/resources/static/index.html
@@ -590,7 +590,7 @@ git commit -m "feat: add doubleBooking radio and red cells for double-booked sea
 **Interfaces:**
 - Consumes: 전체
 
-- [ ] **Step 1: DoD 스크립트 교체**
+- [x] **Step 1: DoD 스크립트 교체**
 
 `scripts/dod.sh` 전체를 아래로 교체한다.
 
@@ -625,7 +625,7 @@ for d in NONE UNIQUE_CONSTRAINT; do
 done
 ```
 
-- [ ] **Step 2: 기동과 DoD 실행**
+- [x] **Step 2: 기동과 DoD 실행**
 
 Run: `docker compose down -v && docker compose up -d --build && sleep 25 && ./scripts/dod.sh 2>&1 | tee /tmp/m2-dod.txt`
 Expected:
@@ -635,7 +635,7 @@ Expected:
 
 `dup`이 0으로 나오면 `raceWindowMs`가 실제로 좌석 단계에서 적용되는지(`takeSeat`의 sleep)와 `picks` 범위를 먼저 의심한다. `UNIQUE_CONSTRAINT`에서 `dupKey=0`이면 `SHOW INDEX FROM reservation`으로 인덱스가 실제로 생겼는지 본다.
 
-- [ ] **Step 3: decisions.md에 결정 추가**
+- [x] **Step 3: decisions.md에 결정 추가**
 
 `docs/decisions.md` 표 끝에 추가한다.
 
@@ -648,7 +648,7 @@ Expected:
 | 2026-09-20 | DEGRADED 기준선 키에 `doubleBooking` 포함 | 좌석 NONE 경로가 sleep을 하나 더 하므로 같은 좌석 전략끼리만 비교해야 한다. |
 ```
 
-- [ ] **Step 4: README 갱신**
+- [x] **Step 4: README 갱신**
 
 `README.md`에서:
 - `## What works today (M0 + M1)` → `## What works today (M0 + M1 + M2)`. 목록 끝에 추가:
@@ -661,7 +661,7 @@ Expected:
 - `## How it is put together`의 파일 목록 설명 `app/ReservationService.kt one SQL path per strategy`를 `app/ReservationService.kt seat step, then one SQL path per counter strategy`로 바꾼다.
 - `## API` 예시 요청 본문의 `"strategies": { "oversell": "NONE" }`을 `"strategies": { "oversell": "NONE", "doubleBooking": "NONE" }`으로 바꾼다.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/dod.sh
@@ -672,7 +672,7 @@ git add README.md
 git commit -m "docs: record M2 results and mark roadmap"
 ```
 
-- [ ] **Step 6: 계획 체크박스 갱신 후 커밋**
+- [x] **Step 6: 계획 체크박스 갱신 후 커밋**
 
 이 문서의 `- [ ]`를 모두 `- [x]`로 바꾼다.
 
