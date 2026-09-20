@@ -1,5 +1,6 @@
 package lab.web
 
+import lab.Progress
 import lab.RunReport
 import lab.RunSpec
 import org.springframework.context.annotation.Profile
@@ -14,7 +15,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
-data class RunState(val status: String, val report: RunReport? = null, val error: String? = null)
+data class RunState(val status: String, val progress: Progress, val report: RunReport? = null, val error: String? = null)
 
 @RestController
 @Profile("web")
@@ -28,12 +29,13 @@ class RunController(private val runner: LoadRunner) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("error" to "run in progress"))
         }
         val runId = UUID.randomUUID().toString()
-        runs[runId] = RunState("RUNNING")
+        val progress = Progress()
+        runs[runId] = RunState("RUNNING", progress)
         Thread.startVirtualThread {
             try {
-                runs[runId] = RunState("DONE", report = runner.run(runId, spec))
+                runs[runId] = RunState("DONE", progress, report = runner.run(runId, spec, progress))
             } catch (e: Exception) {
-                runs[runId] = RunState("ERROR", error = e.toString())
+                runs[runId] = RunState("ERROR", progress, error = e.toString())
             } finally {
                 running.set(false)
             }
