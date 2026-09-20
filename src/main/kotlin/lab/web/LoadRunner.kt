@@ -10,6 +10,7 @@ import lab.RunReport
 import lab.RunSpec
 import lab.Sample
 import lab.buildReport
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Profile
 import org.springframework.http.client.JdkClientHttpRequestFactory
@@ -28,6 +29,7 @@ class LoadRunner(
     private val jdbc: JdbcClient,
     @Value("\${lab.app-urls}") private val appUrls: List<String>,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
     private val client = RestClient.builder().requestFactory(JdkClientHttpRequestFactory()).build()
     // DEGRADED 기준선: 같은 (N, M, appInstances, raceWindowMs, doubleBooking)의 최근 NONE 처리량. ponytail: 메모리 보관.
     private val baselines = ConcurrentHashMap<List<Any>, Double>()
@@ -54,7 +56,7 @@ class LoadRunner(
                         client.post().uri("${targets[userId % targets.size]}/api/reserve")
                             .body(ReserveRequest(eventId, userId.toLong(), seatNo, spec.strategies.oversell, spec.strategies.doubleBooking, spec.raceWindowMs))
                             .retrieve().body(ReserveResponse::class.java)!!
-                    }.getOrElse { ReserveResponse(Outcome.ERROR) }
+                    }.getOrElse { ex -> log.warn("reserve failed user={} seat={}", userId, seatNo, ex); ReserveResponse(Outcome.ERROR) }
                     when (res.result) {
                         Outcome.OK -> { progress.ok.incrementAndGet(); progress.seats[seatNo - 1].incrementAndGet() }
                         Outcome.SOLD_OUT -> progress.soldOut.incrementAndGet()
