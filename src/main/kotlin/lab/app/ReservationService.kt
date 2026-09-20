@@ -16,15 +16,23 @@ import org.springframework.transaction.support.TransactionTemplate
 class ReservationService(private val jdbc: JdbcClient, private val tx: TransactionTemplate) {
     private val localLock = Any() // ponytail: 전역 락. 실행당 이벤트가 하나라 이벤트별 락과 결과가 같다.
 
-    // 좌석 먼저, 카운터 나중. 좌석을 잡은 요청만 카운터를 차감하고, 카운터가 OK가 아니면 자기 행을 되돌린다.
+    // 좌석 먼저, 카운터 나중. 좌석을 잡은 요청만 카운터를 차감하고, 카운터가 OK가 아니면(예외 포함) 자기 행을 되돌린다.
     fun reserve(req: ReserveRequest): ReserveResponse {
         takeSeat(req)?.let { return ReserveResponse(it) }
-        val res = counter(req.eventId, req.strategy, req.raceWindowMs)
-        if (res.result != Outcome.OK) {
-            jdbc.sql("DELETE FROM reservation WHERE event_id = :e AND seat_no = :s AND user_id = :u")
-                .param("e", req.eventId).param("s", req.seatNo).param("u", req.userId).update()
+        val res = try {
+            counter(req.eventId, req.strategy, req.raceWindowMs)
+        } catch (e: Exception) {
+            release(req)
+            throw e
         }
+        if (res.result != Outcome.OK) release(req)
         return res
+    }
+
+    // 카운터 단계가 OK로 끝나지 않았을 때 자신의 좌석 행을 되돌린다.
+    private fun release(req: ReserveRequest) {
+        jdbc.sql("DELETE FROM reservation WHERE event_id = :e AND seat_no = :s AND user_id = :u")
+            .param("e", req.eventId).param("s", req.seatNo).param("u", req.userId).update()
     }
 
     // 좌석 단계. 잡았으면 null, 거절이면 그 Outcome. 락도 트랜잭션도 없다.
