@@ -6,6 +6,7 @@ import lab.Outcome
 import lab.OversellStrategy
 import lab.ReserveRequest
 import lab.ReserveResponse
+import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Profile
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -17,6 +18,8 @@ import kotlin.concurrent.withLock
 @Service
 @Profile("app")
 class ReservationService(private val jdbc: JdbcClient, private val tx: TransactionTemplate, private val stock: StockCache) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     // ponytail: 전역 락. 실행당 이벤트가 하나라 이벤트별 락과 결과가 같다.
     // synchronized가 아닌 ReentrantLock인 이유: JDK 21 가상 스레드는 synchronized 대기 중 캐리어를 핀해서
     // 락 밖의 좌석 단계까지 굶긴다(커넥션 풀 고갈). ReentrantLock 대기는 언마운트된다.
@@ -68,12 +71,21 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
     private fun counter(req: ReserveRequest): ReserveResponse {
         if (req.cache == CacheStrategy.REDIS_AS_SOT) {
             if (!stock.decrement(req.eventId)) return ReserveResponse(Outcome.SOLD_OUT)
-            jdbc.sql("UPDATE event SET remaining = remaining - 1 WHERE id = :id").param("id", req.eventId).update()
+            try {
+                jdbc.sql("UPDATE event SET remaining = remaining - 1 WHERE id = :id").param("id", req.eventId).update()
+            } catch (e: Exception) {
+                // DB 쓰기가 실패하면 Redis 카운터를 되돌린다. 좌석 행은 reserve()가 되돌린다.
+                stock.restore(req.eventId)
+                throw e
+            }
             return ReserveResponse(Outcome.OK)
         }
         val res = dbCounter(req.eventId, req.strategy, req.raceWindowMs)
         // 커밋 이후에 지운다(PESSIMISTIC의 tx.execute가 반환된 뒤). 커밋 전이면 조회자가 커밋 전 값을 재적재한다.
-        if (res.result == Outcome.OK && req.cache == CacheStrategy.INVALIDATE_ON_WRITE) stock.invalidate(req.eventId)
+        // 예약은 이미 커밋됐다. DEL 실패는 stale로 남을 뿐 예약을 되돌릴 이유가 아니다.
+        if (res.result == Outcome.OK && req.cache == CacheStrategy.INVALIDATE_ON_WRITE) {
+            runCatching { stock.invalidate(req.eventId) }.onFailure { log.warn("cache invalidate failed event={}", req.eventId, it) }
+        }
         return res
     }
 

@@ -31,8 +31,12 @@ class StockCache(private val redis: StringRedisTemplate, private val jdbc: JdbcC
     fun decrement(eventId: Long): Boolean {
         val left = redis.opsForValue().decrement(key(eventId))!!
         if (left >= 0) return true
-        redis.opsForValue().increment(key(eventId))
+        restore(eventId)
         return false
+    }
+
+    fun restore(eventId: Long) {
+        redis.opsForValue().increment(key(eventId))
     }
 
     fun invalidate(eventId: Long) {
