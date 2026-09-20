@@ -52,7 +52,7 @@
   - `data class Progress(val ok: AtomicInteger = AtomicInteger(), val soldOut: AtomicInteger = AtomicInteger(), val error: AtomicInteger = AtomicInteger())`
   - `fun buildReport(runId: String, spec: RunSpec, samples: List<Sample>, remaining: Int, elapsedMs: Long, baselineThroughput: Double? = null): RunReport`
 
-- [ ] **Step 1: 실패하는 테스트 추가**
+- [x] **Step 1: 실패하는 테스트 추가**
 
 `src/test/kotlin/lab/ReportTest.kt` 클래스 안에 아래 세 테스트를 추가한다. 기존 4개는 그대로 둔다.
 
@@ -89,12 +89,12 @@
     }
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test --tests lab.ReportTest`
 Expected: 컴파일 실패 (`retries`, `baselineThroughput` 없음).
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `src/main/kotlin/lab/Models.kt` 전체를 아래로 교체한다.
 
@@ -192,12 +192,12 @@ fun buildReport(
 }
 ```
 
-- [ ] **Step 4: 통과 확인**
+- [x] **Step 4: 통과 확인**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test --tests lab.ReportTest`
 Expected: 7 tests PASS. (다른 파일은 아직 `ReserveResponse(result)`만 쓰므로 컴파일된다.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/kotlin/lab/Models.kt src/test/kotlin/lab/ReportTest.kt
@@ -216,7 +216,7 @@ git commit -m "feat: add M1 strategies, performance fields and DEGRADED verdict 
 - Consumes: Task 1의 `OversellStrategy`, `Outcome`, `ReserveResponse`
 - Produces: `ReservationService.reserve(eventId: Long, strategy: OversellStrategy, raceWindowMs: Long): ReserveResponse` (`activeConnections`는 0, 컨트롤러가 채움). `POST /api/reserve` 응답 `{ result, retries, activeConnections }`.
 
-- [ ] **Step 1: 서비스 교체**
+- [x] **Step 1: 서비스 교체**
 
 `src/main/kotlin/lab/app/ReservationService.kt` 전체를 아래로 교체한다. `TransactionTemplate`은 spring-boot-starter-jdbc가 자동 구성한다.
 
@@ -286,7 +286,7 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
 }
 ```
 
-- [ ] **Step 2: 컨트롤러 교체**
+- [x] **Step 2: 컨트롤러 교체**
 
 `src/main/kotlin/lab/app/ReserveController.kt` 전체를 아래로 교체한다. `hikariPoolMXBean`은 첫 커넥션 전에는 null이므로 요청마다 읽는다.
 
@@ -316,12 +316,12 @@ class ReserveController(private val service: ReservationService, private val dat
 }
 ```
 
-- [ ] **Step 3: 컴파일 확인**
+- [x] **Step 3: 컴파일 확인**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew build -x test`
 Expected: BUILD SUCCESSFUL.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/main/kotlin/lab/app
@@ -340,7 +340,7 @@ git commit -m "feat: add LOCAL_LOCK, PESSIMISTIC, OPTIMISTIC strategies and conn
 - Consumes: Task 1의 `Progress`, `Sample`, `ReserveResponse`, `buildReport(..., baselineThroughput)`; Task 2의 `POST /api/reserve` 응답
 - Produces: `LoadRunner.run(runId: String, spec: RunSpec, progress: Progress): RunReport`. `GET /api/runs/{id}` → `{ status, progress: { ok, soldOut, error }, report?, error? }`.
 
-- [ ] **Step 1: LoadRunner 교체**
+- [x] **Step 1: LoadRunner 교체**
 
 `src/main/kotlin/lab/web/LoadRunner.kt` 전체를 아래로 교체한다.
 
@@ -420,7 +420,7 @@ class LoadRunner(
 }
 ```
 
-- [ ] **Step 2: RunController 수정**
+- [x] **Step 2: RunController 수정**
 
 `src/main/kotlin/lab/web/RunController.kt`에서 `RunState`와 `start`를 아래처럼 바꾼다.
 
@@ -448,12 +448,12 @@ data class RunState(val status: String, val progress: Progress, val report: RunR
 
 import에 `lab.Progress` 추가.
 
-- [ ] **Step 3: 컴파일·테스트 확인**
+- [x] **Step 3: 컴파일·테스트 확인**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew build`
 Expected: BUILD SUCCESSFUL, 7 tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/main/kotlin/lab/web
@@ -470,7 +470,7 @@ git commit -m "feat: expose run progress counters and NONE baseline for DEGRADED
 **Interfaces:**
 - Consumes: Task 3의 `GET /api/runs/{id}` 응답 (`progress.ok`, `report.verdict`, `report.spec.seatCount`)
 
-- [ ] **Step 1: 페이지 교체**
+- [x] **Step 1: 페이지 교체**
 
 `src/main/resources/static/index.html` 전체를 아래로 교체한다.
 
@@ -547,12 +547,12 @@ f.onsubmit = async e => {
 </script>
 ```
 
-- [ ] **Step 2: 로컬 확인**
+- [x] **Step 2: 로컬 확인**
 
 Run: `docker compose up -d --build && sleep 25 && open http://localhost:8080`
 브라우저에서 `LOCAL_LOCK` 선택 후 appInstances=2이면 select에 주황 테두리, 실행하면 그리드가 초록으로 차오르고 초과분이 주황으로 붙으며 배지가 `FAIL`. appInstances=1이면 배지 `PASS`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/resources/static/index.html
@@ -570,7 +570,7 @@ git commit -m "feat: add seat grid, verdict badge and M1 strategy radios"
 **Interfaces:**
 - Consumes: 전체
 
-- [ ] **Step 1: DoD 스크립트 교체**
+- [x] **Step 1: DoD 스크립트 교체**
 
 `scripts/dod.sh` 전체를 아래로 교체한다.
 
@@ -598,7 +598,7 @@ for s in NONE LOCAL_LOCK CONDITIONAL_UPDATE PESSIMISTIC OPTIMISTIC; do
 done
 ```
 
-- [ ] **Step 2: 기동과 DoD 실행**
+- [x] **Step 2: 기동과 DoD 실행**
 
 Run: `docker compose up -d --build && sleep 25 && ./scripts/dod.sh 2>&1 | tee /tmp/m1-dod.txt`
 Expected:
@@ -610,7 +610,7 @@ Expected:
 
 재현이 안 되면 `raceWindowMs`, Hikari 풀 크기, `innodb_lock_wait_timeout`(기본 50초)을 먼저 의심한다.
 
-- [ ] **Step 3: README 갱신**
+- [x] **Step 3: README 갱신**
 
 `README.md`에서:
 - `## What works today (M0)` 제목을 `## What works today (M0 + M1)`으로 바꾸고, 목록에 다음을 추가한다.
@@ -621,7 +621,7 @@ Expected:
 - 로드맵의 M1 항목을 `- [x]`로 바꾼다.
 - `## Documents`에 `[M1 design](docs/superpowers/specs/2026-09-20-m1-design.md) and [M1 implementation plan](docs/superpowers/plans/2026-09-20-m1-strategies.md) (Korean)` 줄을 추가한다.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add scripts/dod.sh
