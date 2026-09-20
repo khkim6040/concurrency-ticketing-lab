@@ -1,0 +1,14 @@
+server:
+  port: ${PORT:8080}
+spring:
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/lab}
+    username: ${DB_USER:lab}
+    password: ${DB_PASSWORD:lab}
+    hikari:
+      maximum-pool-size: 20
+lab:
+  app-urls: ${APP_URLS:http://localhost:8081,http://localhost:8082}
