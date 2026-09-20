@@ -4,7 +4,7 @@ A simulator that lets you switch race conditions in a ticket booking system on a
 
 The whole point is one claim: the more consistency you enforce, the less throughput you get. If turning every defense on looked like the right answer, the tool would be teaching the wrong lesson, so both axes are always shown side by side.
 
-## What works today (M0 + M1 + M2)
+## What works today (M0 + M1 + M2 + M3)
 
 - Two app servers and MySQL, started with Docker Compose. With a single server every problem here can be solved by a JVM lock, which is exactly the wrong lesson, so two is the minimum.
 - A `raceWindowMs` knob that sleeps between the read and the write to widen the race window on purpose. Without it, oversell shows up in some runs and not others, which is useless for teaching.
@@ -14,6 +14,8 @@ The whole point is one claim: the more consistency you enforce, the less through
 - A seat grid that fills in while the run is in flight, polled every 200 ms. The first N cells are seats: gray unsold, green sold once, red sold to two or more users. Orange cells appended after the N seats are not seats; there is one per confirmed booking past capacity.
 - A `reservation` row per confirmed seat. Each user picks a seat from `Random(seed)`, holds it first and only then takes a ticket from the counter, so the locks and transactions of the oversell axis only ever wrap the counter step. Two strategies: `NONE` (application check, then insert) and `UNIQUE_CONSTRAINT` (a unique index on `(event_id, seat_no)` that the web tier creates or drops at the start of every run).
 - `doubleBookedSeats` counted directly in the DB after the run, `duplicateKeyCount` from the app's `DuplicateKeyException`s, and red cells in the seat grid.
+- A Redis stock cache and a read path (`GET /api/stock`). Two viewer threads poll it every 10 ms during the run and for two seconds after, and every read that returns a positive remaining count after the N-th confirmed booking is a `phantomStockView`. Four strategies: `NONE` (cache-aside, 60 s TTL), `TTL_SHORT` (1 s TTL), `INVALIDATE_ON_WRITE` (delete the key after every decrement) and `REDIS_AS_SOT` (the counter lives in Redis, `DECR` decides, and the oversell strategy is ignored).
+- `phantomStockViews`, `staleWindowMs` (how long after sell-out the last stale read was served) and `viewDbReads` (how many reads the cache did not absorb). None of them affect the verdict: a stale read is a design choice, and the UI says so under the report.
 
 Since M2, every request first takes a seat and only seat winners reach the counter. Under `NONE` this means oversold is a few dozen to a few hundred rather than a fixed 900, and it varies run to run because which seats collide is random. The seat step also adds a sleep in front of every strategy, so the throughput below is lower than what M1 originally measured for the same strategies.
 
@@ -45,6 +47,18 @@ Results from ten runs each with the same parameters, `CONDITIONAL_UPDATE`, two a
 
 The reverse does not hold. The unique index lets at most N requests reach the counter at all, so `oversoldCount` is 0 under `UNIQUE_CONSTRAINT` whatever the oversell strategy is. Try `oversell=NONE` with `doubleBooking=UNIQUE_CONSTRAINT` and read `ledgerMismatch`, not `oversoldCount`. Also, `PASS` in the `UNIQUE_CONSTRAINT` row means consistent only: the DoD script records no `NONE` baseline for that seat strategy, so the `DEGRADED` check never runs there.
 
+Results from five runs each with the same parameters, `CONDITIONAL_UPDATE` + `UNIQUE_CONSTRAINT`, two app instances, all four `cacheConsistency` strategies:
+
+| Cache | Verdict | Phantom views | Stale window | DB reads / views | Throughput (req/s) | p99 |
+| --- | --- | --- | --- | --- | --- | --- |
+| NONE | PASS 5/5 | 256 to 279 | 2,032 to 2,055 ms | 1 to 2 / 267 to 294 | 5,154 to 5,847 | 160 to 189 ms |
+| TTL_SHORT | PASS 5/5 | 120 to 128 | 877 to 912 ms | 5 to 6 / 273 to 285 | 5,208 to 6,024 | 158 to 182 ms |
+| INVALIDATE_ON_WRITE | PASS 5/5 | 274 to 286 (2/5 runs) | 2,048 to 2,056 ms (2/5 runs) | 6 to 7 / 265 to 292 | 5,235 to 5,952 | 161 to 181 ms |
+| REDIS_AS_SOT | PASS 5/5 | 0 | 0 ms | 0 / 276 to 294 | 5,291 to 5,882 | 162 to 182 ms |
+| `INVALIDATE_ON_WRITE` (raceWindowMs=200) | PASS 5/5 | 240 to 250 (5/5 runs) | 2,030 to 2,052 ms | 2 / 242 to 252 | 5,319 to 6,060 | 160 to 183 ms |
+
+`NONE` keeps the first value it saw until the TTL expires, which is after the run ends. `TTL_SHORT` bounds the window to the TTL and no lower; the TTL that closes it is zero, which is no cache. `INVALIDATE_ON_WRITE` is right until a reader that missed the cache, read the database and slept lands its stale value after the last write's delete, and then nothing deletes it again. At the default 20 ms window the hundred sales finish before the viewer's first read comes back, so that reader usually refills with zero and the race lands only in some runs (2/5 here); at 200 ms the refill straddles the last write and the stale value sticks in every run (5/5). The race is a property of the read latency against the write burst, not of the window knob, which only makes it visible. `REDIS_AS_SOT` has no second copy, so the only staleness left is the time between reading a value and looking at it, which the measurement shows as zero or one view. The cost side is the DB reads column: the shorter the window, the less the cache absorbs.
+
 ## Running it
 
 You need JDK 21 and Docker.
@@ -63,7 +77,7 @@ open http://localhost:8080      # parameter form and results
 POST /api/runs
 {
   "seatCount": 100, "userCount": 1000, "appInstances": 2,
-  "raceWindowMs": 20, "strategies": { "oversell": "NONE", "doubleBooking": "NONE" }
+  "raceWindowMs": 20, "strategies": { "oversell": "NONE", "doubleBooking": "NONE", "cacheConsistency": "NONE" }
 }
 → 202 { "runId": "..." }   (409 if a run is already in progress)
 
@@ -77,12 +91,13 @@ One Spring Boot module, built into one image, with the role picked by profile. T
 
 The load generator spawns M virtual threads and lines them up behind a single `CountDownLatch`. Requests have to originate on the server rather than in the browser, otherwise start-time jitter alone is enough to make the race disappear.
 
-Database access goes through `JdbcClient` with the SQL written out by hand. JPA is deliberately absent. The lock layer (`FOR UPDATE`, conditional updates, version checks) has to be visible in the code or there is nothing to learn from.
+Database access goes through `JdbcClient` with the SQL written out by hand. JPA is deliberately absent. The lock layer (`FOR UPDATE`, conditional updates, version checks) has to be visible in the code or there is nothing to learn from. Redis holds the stock cache under `stock:{eventId}`; under `REDIS_AS_SOT` it holds the counter itself.
 
 ```
 src/main/kotlin/lab/
   Models.kt                 shared types and report aggregation
-  app/ReservationService.kt seat step, then one SQL path per counter strategy
+  app/ReservationService.kt seat step, then one SQL path per counter strategy, or DECR under REDIS_AS_SOT
+  app/StockCache.kt         stock:{eventId} read path, DECR counter, DEL on write
   app/ReserveController.kt  POST /api/reserve
   web/LoadRunner.kt         simultaneous start, result collection
   web/RunController.kt      POST /api/runs, GET /api/runs/{id}
@@ -95,7 +110,7 @@ scripts/dod.sh              reproducibility check
 - [x] M0 End-to-end skeleton. Oversell NONE / CONDITIONAL_UPDATE, two app instances, numbers-only UI
 - [x] M1 LOCAL_LOCK / PESSIMISTIC / OPTIMISTIC, one-vs-two instance toggle, performance metrics, seat grid
 - [x] M2 Double booking. `reservation` table, unique index toggled at runtime
-- [ ] M3 Cache layer. Redis, four stale-read strategies
+- [x] M3 Cache layer. Redis, four stale-read strategies, `phantomStockViews`
 - [ ] M4 Side-by-side comparison, seed-based share links, per-strategy explanations
 
 ## Documents
@@ -105,3 +120,4 @@ scripts/dod.sh              reproducibility check
 - [M0 design](docs/superpowers/specs/2026-09-20-m0-design.md) and [M0 implementation plan](docs/superpowers/plans/2026-09-20-m0-skeleton.md) (Korean)
 - [M1 design](docs/superpowers/specs/2026-09-20-m1-design.md) and [M1 implementation plan](docs/superpowers/plans/2026-09-20-m1-strategies.md) (Korean)
 - [M2 design](docs/superpowers/specs/2026-09-20-m2-design.md) and [M2 implementation plan](docs/superpowers/plans/2026-09-20-m2-double-booking.md) (Korean)
+- [M3 design](docs/superpowers/specs/2026-09-20-m3-design.md) and [M3 implementation plan](docs/superpowers/plans/2026-09-20-m3-cache-layer.md) (Korean)
