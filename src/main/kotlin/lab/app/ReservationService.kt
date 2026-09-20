@@ -27,7 +27,8 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
         val res = try {
             counter(req.eventId, req.strategy, req.raceWindowMs)
         } catch (e: Exception) {
-            release(req)
+            // release가 같은 이유로 실패해도 원래 예외를 유지한다. 행 누수는 doubleBookedSeats를 부풀린다.
+            runCatching { release(req) }.onFailure(e::addSuppressed)
             throw e
         }
         if (res.result != Outcome.OK) release(req)
