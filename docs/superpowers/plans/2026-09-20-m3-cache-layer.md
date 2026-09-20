@@ -58,7 +58,7 @@
   - `data class PerformanceMetrics(throughput, p50Ms, p95Ms, p99Ms, errorCount, retryCount, dbConnectionPeak, duplicateKeyCount, viewCount: Int, viewDbReads: Int)`
   - `fun buildReport(runId: String, spec: RunSpec, samples: List<Sample>, remaining: Int, elapsedMs: Long, baselineThroughput: Double? = null, doubleBookedSeats: Int = 0, views: List<View> = emptyList(), soldOutAtMs: Long? = null): RunReport`
 
-- [ ] **Step 1: 실패하는 테스트 추가**
+- [x] **Step 1: 실패하는 테스트 추가**
 
 `src/test/kotlin/lab/ReportTest.kt` 클래스 안에 아래 두 테스트를 추가한다. 기존 9개는 그대로 둔다.
 
@@ -89,12 +89,12 @@
     }
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test --tests 'lab.ReportTest' 2>&1 | tail -20`
 Expected: 컴파일 실패. `Unresolved reference 'View'`, `phantomStockViews` 등.
 
-- [ ] **Step 3: Models.kt 수정**
+- [x] **Step 3: Models.kt 수정**
 
 `src/main/kotlin/lab/Models.kt`에서:
 
@@ -217,7 +217,7 @@ fun buildReport(
 }
 ```
 
-- [ ] **Step 4: LoadRunner의 ReserveRequest 생성에 `cache` 추가 (컴파일 유지)**
+- [x] **Step 4: LoadRunner의 ReserveRequest 생성에 `cache` 추가 (컴파일 유지)**
 
 `src/main/kotlin/lab/web/LoadRunner.kt`의 `.body(ReserveRequest(eventId, userId.toLong(), seatNo, spec.strategies.oversell, spec.strategies.doubleBooking, spec.raceWindowMs))`를 아래로 바꾼다.
 
@@ -225,12 +225,12 @@ fun buildReport(
                             .body(ReserveRequest(eventId, userId.toLong(), seatNo, spec.strategies.oversell, spec.strategies.doubleBooking, spec.strategies.cacheConsistency, spec.raceWindowMs))
 ```
 
-- [ ] **Step 5: 통과 확인**
+- [x] **Step 5: 통과 확인**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test 2>&1 | tail -5`
 Expected: `BUILD SUCCESSFUL`, 11 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/kotlin/lab/Models.kt src/main/kotlin/lab/web/LoadRunner.kt src/test/kotlin/lab/ReportTest.kt
@@ -259,7 +259,7 @@ git commit -m "feat: add cache strategy types and phantom view metrics to the re
   - `GET /api/stock?eventId=&cache=&raceWindowMs=` → `StockResponse`
   - Redis 키 규칙 `stock:{eventId}` (web이 Task 3에서 같은 키를 시드한다)
 
-- [ ] **Step 1: 의존성과 설정**
+- [x] **Step 1: 의존성과 설정**
 
 `build.gradle.kts`의 `dependencies`에서 `spring-boot-starter-jdbc` 줄 아래에 추가:
 
@@ -325,7 +325,7 @@ services:
       - redis
 ```
 
-- [ ] **Step 2: StockCache 작성**
+- [x] **Step 2: StockCache 작성**
 
 `src/main/kotlin/lab/app/StockCache.kt`를 새로 만든다.
 
@@ -373,7 +373,7 @@ class StockCache(private val redis: StringRedisTemplate, private val jdbc: JdbcC
 }
 ```
 
-- [ ] **Step 3: ReservationService 수정**
+- [x] **Step 3: ReservationService 수정**
 
 `src/main/kotlin/lab/app/ReservationService.kt`에서:
 
@@ -408,7 +408,7 @@ class ReservationService(private val jdbc: JdbcClient, private val tx: Transacti
     }
 ```
 
-- [ ] **Step 4: ReserveController에 조회 매핑 추가**
+- [x] **Step 4: ReserveController에 조회 매핑 추가**
 
 `src/main/kotlin/lab/app/ReserveController.kt`를 아래로 교체:
 
@@ -447,17 +447,17 @@ class ReserveController(private val service: ReservationService, private val sto
 }
 ```
 
-- [ ] **Step 5: 빌드와 테스트**
+- [x] **Step 5: 빌드와 테스트**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test 2>&1 | tail -5`
 Expected: `BUILD SUCCESSFUL`. `ReportTest`는 Spring 컨텍스트를 띄우지 않으므로 Redis 없이 통과한다.
 
-- [ ] **Step 6: 컨테이너 기동 확인**
+- [x] **Step 6: 컨테이너 기동 확인**
 
 Run: `docker compose up -d --build && sleep 25 && docker compose ps && docker compose logs app-1 2>&1 | grep -E 'Started|ERROR' | tail -3`
 Expected: `redis`, `mysql`, `app-1`, `app-2`, `web` 모두 running. `Started LabApplicationKt` 로그, ERROR 없음. 스키마는 바뀌지 않았으므로 `down -v`는 필요 없다.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add build.gradle.kts src/main/resources/application.yml docker-compose.yml
@@ -477,7 +477,7 @@ git commit -m "feat: add stock cache read path and four cache strategies"
 - Consumes: Task 1의 `View`, `StockResponse`, `Progress.lastView`, `buildReport(views, soldOutAtMs)`; Task 2의 `GET /api/stock`과 키 `stock:{eventId}`
 - Produces: `RunReport`에 `phantomStockViews`, `staleWindowMs`, `viewCount`, `viewDbReads`가 채워진다. `Progress.lastView`가 실행 중 갱신된다.
 
-- [ ] **Step 1: LoadRunner 교체**
+- [x] **Step 1: LoadRunner 교체**
 
 `src/main/kotlin/lab/web/LoadRunner.kt` 전체를 아래로 교체한다.
 
@@ -624,12 +624,12 @@ class LoadRunner(
 }
 ```
 
-- [ ] **Step 2: 빌드**
+- [x] **Step 2: 빌드**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test 2>&1 | tail -5`
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 3: 컨테이너 재기동과 끝-끝 확인**
+- [x] **Step 3: 컨테이너 재기동과 끝-끝 확인**
 
 Run:
 
@@ -657,7 +657,7 @@ Expected:
 
 `views=0`이면 web 로그(`docker compose logs web | grep 'stock view failed'`)에서 조회 URL·Redis 연결을 본다. `REDIS_AS_SOT`에서 `oversold>0`이면 키 시드가 실행되는지(`docker compose exec redis redis-cli keys 'stock:*'`)를 본다.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/main/kotlin/lab/web/LoadRunner.kt
@@ -674,7 +674,7 @@ git commit -m "feat: run stock viewers and measure phantom views after sold out"
 **Interfaces:**
 - Consumes: `POST /api/runs`의 `strategies.cacheConsistency`, `GET /api/runs/{id}`의 `progress.lastView`, `progress.ok`
 
-- [ ] **Step 1: index.html 수정**
+- [x] **Step 1: index.html 수정**
 
 `<h1>concurrency-ticketing-lab — M2</h1>`을 `<h1>concurrency-ticketing-lab — M3</h1>`으로.
 
@@ -746,7 +746,7 @@ function showStock(n, ok, lastView) {
 - `draw(body.seatCount, 0, []);` 뒤에 `showStock(body.seatCount, 0, -1);` 추가.
 - 타이머 안 `draw(body.seatCount, s.progress.ok, s.progress.seats);` 뒤에 `showStock(body.seatCount, s.progress.ok, s.progress.lastView);` 추가.
 
-- [ ] **Step 2: 브라우저 확인**
+- [x] **Step 2: 브라우저 확인**
 
 Run: `docker compose up -d --build && sleep 25`, 그리고 브라우저(Playwright MCP 가능)로 `http://localhost:8080`을 연다.
 Expected:
@@ -756,7 +756,7 @@ Expected:
 - `REDIS_AS_SOT` + `oversell=NONE`으로 실행하면 `oversoldCount=0`.
 - 해설 블록이 리포트 아래에 항상 보인다.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/main/resources/static/index.html
@@ -776,7 +776,7 @@ git commit -m "feat: add cacheConsistency radio, live viewer stock line and stal
 **Interfaces:**
 - Consumes: 전체
 
-- [ ] **Step 1: DoD 스크립트 교체**
+- [x] **Step 1: DoD 스크립트 교체**
 
 `scripts/dod.sh` 전체를 아래로 교체한다.
 
@@ -818,7 +818,7 @@ for c in NONE TTL_SHORT INVALIDATE_ON_WRITE REDIS_AS_SOT; do
 done
 ```
 
-- [ ] **Step 2: 기동과 DoD 실행**
+- [x] **Step 2: 기동과 DoD 실행**
 
 Run: `docker compose up -d --build && sleep 25 && ./scripts/dod.sh 2>&1 | tee /tmp/m3-dod.txt`
 Expected:
@@ -831,7 +831,7 @@ Expected:
 
 `NONE`에서 `phantom=0`이면 `soldOutAt`이 찍히는지(`ok`가 100에 도달하는지)와 조회자가 실제로 도는지(`viewCount`)를 먼저 본다. `TTL_SHORT`의 `stale`이 1,100ms를 크게 넘으면 `SET ... EX`의 TTL 분기를 의심한다.
 
-- [ ] **Step 3: decisions.md에 결정 추가**
+- [x] **Step 3: decisions.md에 결정 추가**
 
 `docs/decisions.md` 표 끝에 추가한다.
 
@@ -847,7 +847,7 @@ Expected:
 | 2026-09-20 | DEGRADED 기준선 키에 `cacheConsistency` 포함 | `INVALIDATE_ON_WRITE`는 쓰기마다 `DEL`, `REDIS_AS_SOT`는 경로가 다르므로 같은 캐시 전략끼리만 비교. |
 ```
 
-- [ ] **Step 4: README 갱신**
+- [x] **Step 4: README 갱신**
 
 `README.md`에서:
 - `## What works today (M0 + M1 + M2)` → `## What works today (M0 + M1 + M2 + M3)`. 목록 끝에 추가:
@@ -861,7 +861,7 @@ Expected:
 - `## Documents`에 `- [M3 design](docs/superpowers/specs/2026-09-20-m3-design.md) and [M3 implementation plan](docs/superpowers/plans/2026-09-20-m3-cache-layer.md) (Korean)` 줄을 추가한다.
 - `## Running it`의 `You need JDK 21 and Docker.`는 그대로. `docker compose up -d --build` 설명에 Redis가 함께 뜬다는 말은 넣지 않는다(compose가 말한다).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/dod.sh
@@ -872,7 +872,7 @@ git add README.md
 git commit -m "docs: record M3 results and mark roadmap"
 ```
 
-- [ ] **Step 6: 계획 체크박스 갱신 후 커밋**
+- [x] **Step 6: 계획 체크박스 갱신 후 커밋**
 
 이 문서의 `- [ ]`를 모두 `- [x]`로 바꾼다.
 
