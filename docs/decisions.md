@@ -37,4 +37,4 @@
 | 2026-09-20 | 지표에 `staleWindowMs`(마지막 phantom − soldOutAt)와 `viewDbReads` 추가 | phantom 수는 폴링 주기에 좌우되지만 ms 창은 직관적. `viewDbReads`가 이 축의 비용 면(캐시가 DB를 얼마나 막는가). |
 | 2026-09-20 | `INVALIDATE_ON_WRITE`의 `DEL`은 `tx.execute` 반환 뒤(커밋 이후) | 커밋 전에 지우면 조회자가 커밋 전 값을 재적재하는 별개의 버그. |
 | 2026-09-20 | DEGRADED 기준선 키에 `cacheConsistency` 포함 | `INVALIDATE_ON_WRITE`는 쓰기마다 `DEL`, `REDIS_AS_SOT`는 경로가 다르므로 같은 캐시 전략끼리만 비교. |
-| 2026-09-20 | M3 DoD는 20ms 4종에 더해 `INVALIDATE_ON_WRITE`를 `raceWindowMs=200`으로 한 번 더 돌린다 | 20ms에서는 판매 100건이 조회자의 첫 SELECT가 풀 대기에서 돌아오기 전에 끝나 재적재가 대개 0을 써서 경합이 일부 실행에서만 걸린다(DoD 2/5). 200ms면 재적재가 마지막 쓰기를 가로질러 매번 걸린다. 경합은 조회 지연 대 쓰기 폭주의 성질이고 창 노브는 그것을 보이게 할 뿐이다. |
+| 2026-09-20 | M3 DoD는 20ms 4종에 더해 `INVALIDATE_ON_WRITE`를 `raceWindowMs=200`으로 한 번 더 돌린다 | 20ms에서는 판매 100건이 조회자의 첫 SELECT가 풀 대기에서 돌아오기 전에 끝나 재적재가 대개 0을 써서 경합이 일부 실행에서만 걸린다(DoD 2/5, 근소 사례까지 세면 3/5). 200ms면 재적재가 마지막 쓰기를 가로질러 매번 걸린다. 경합은 조회 지연 대 쓰기 폭주의 성질이고 창 노브는 그것을 보이게 할 뿐이다. |

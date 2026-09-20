@@ -21,27 +21,29 @@ Since M2, every request first takes a seat and only seat winners reach the count
 
 Results from three runs each with N=100, M=1,000, raceWindowMs=20, `doubleBooking=NONE`, all five strategies, one and two app instances (`./scripts/dod.sh`):
 
+Since M3 two viewer threads poll the stock cache during every run, so these tables were remeasured on this branch; under the default cache strategy they add one or two database reads per run and the numbers move only within run-to-run noise.
+
 | Strategy | Apps | Verdict | Oversold | Ledger | Double booked | Throughput (req/s) | p99 | Retries | Conn peak |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| NONE | 1 | FAIL 3/3 | 84 to 508 | -602 to -177 | 45 to 94 | 706 to 3,125 | 313 to 1,308 ms | 0 | 19 to 20 |
-| NONE | 2 | FAIL 3/3 | 51 to 69 | -161 to -143 | 37 to 52 | 482 to 3,246 | 292 to 2,054 ms | 0 | 13 to 20 |
-| LOCAL_LOCK | 1 | FAIL 3/3 | 0 | 0 | 25 to 27 | 192 to 207 | 4,563 to 4,977 ms | 0 | 20 |
-| LOCAL_LOCK | 2 | FAIL 3/3 | 59 to 100 | -100 to -73 | 44 to 62 | 255 to 479 | 1,813 to 3,657 ms | 0 | 20 |
-| CONDITIONAL_UPDATE | 1 | FAIL 3/3 | 0 | 0 | 21 to 26 | 1,694 to 2,053 | 475 to 574 ms | 0 | 20 |
-| CONDITIONAL_UPDATE | 2 | FAIL 3/3 | 0 | 0 | 21 to 26 | 2,061 to 2,358 | 410 to 467 ms | 0 | 20 |
-| PESSIMISTIC | 1 | FAIL 3/3 | 0 | 0 | 25 to 26 | 84 to 96 | 10,174 to 11,596 ms | 0 | 20 |
-| PESSIMISTIC | 2 | FAIL 3/3 | 0 | 0 | 21 to 27 | 99 to 121 | 7,978 to 9,799 ms | 0 | 20 |
-| OPTIMISTIC | 1 | FAIL 3/3 | 0 | 0 | 20 to 24 | 407 to 411 | 2,426 to 2,441 ms | 15,502 to 20,686 | 20 |
-| OPTIMISTIC | 2 | FAIL 3/3 | 0 | 0 | 23 to 25 | 414 to 419 | 2,378 to 2,407 ms | 17,085 to 18,935 | 20 |
+| NONE | 1 | FAIL 3/3 | 112 to 129 | -224 to -207 | 66 to 71 | 2,824 to 4,545 | 210 to 328 ms | 0 | 20 |
+| NONE | 2 | FAIL 3/3 | 73 to 113 | -207 to -167 | 53 to 60 | 952 to 4,201 | 225 to 1,031 ms | 0 | 17 to 20 |
+| LOCAL_LOCK | 1 | FAIL 3/3 | 0 | 0 | 23 to 26 | 152 to 190 | 5,019 to 6,344 ms | 0 | 20 |
+| LOCAL_LOCK | 2 | FAIL 3/3 | 94 to 100 | -100 to -94 | 59 to 67 | 290 to 386 | 2,403 to 3,228 ms | 0 | 20 |
+| CONDITIONAL_UPDATE | 1 | FAIL 3/3 | 0 | 0 | 23 to 29 | 783 to 2,702 | 356 to 1,262 ms | 0 | 20 |
+| CONDITIONAL_UPDATE | 2 | FAIL 3/3 | 0 | 0 | 19 to 29 | 2,500 to 2,849 | 343 to 389 ms | 0 | 20 |
+| PESSIMISTIC | 1 | FAIL 3/3 | 0 | 0 | 24 to 26 | 90 to 98 | 9,981 to 10,851 ms | 0 | 20 |
+| PESSIMISTIC | 2 | FAIL 3/3 | 0 | 0 | 24 to 28 | 94 to 104 | 9,298 to 10,357 ms | 0 | 20 |
+| OPTIMISTIC | 1 | FAIL 3/3 | 0 | 0 | 25 to 28 | 414 to 418 | 2,384 to 2,403 ms | 14,954 to 22,162 | 20 |
+| OPTIMISTIC | 2 | FAIL 3/3 | 0 | 0 | 24 to 31 | 417 to 423 | 2,353 to 2,390 ms | 16,603 to 18,224 | 20 |
 
-`LOCAL_LOCK` is still the point of the milestone. On one instance the lock serializes every request and the counter balances exactly: oversold and ledger are both 0. On two instances each JVM serializes only its own half, the two halves race each other, and it oversells by 59 to 100 out of 100 seats. None of the counter-consistent strategies show `PASS` or `DEGRADED` in this table, because under the default seat strategy (`doubleBooking=NONE`) a seat can still go to two users even when the counter total is exact, and that failure is counted here too; the table below isolates that axis and shows the fix. `PESSIMISTIC` pins the connection peak at the pool size because each transaction holds its connection while it sleeps inside the row lock. `OPTIMISTIC` keeps the counter exact and is faster than either lock, but it pays for that with tens of thousands of retries.
+`LOCAL_LOCK` is still the point of the milestone. On one instance the lock serializes every request and the counter balances exactly: oversold and ledger are both 0. On two instances each JVM serializes only its own half, the two halves race each other, and it oversells by 94 to 100 out of 100 seats. None of the counter-consistent strategies show `PASS` or `DEGRADED` in this table, because under the default seat strategy (`doubleBooking=NONE`) a seat can still go to two users even when the counter total is exact, and that failure is counted here too; the table below isolates that axis and shows the fix. `PESSIMISTIC` pins the connection peak at the pool size because each transaction holds its connection while it sleeps inside the row lock. `OPTIMISTIC` keeps the counter exact and is faster than either lock, but it pays for that with tens of thousands of retries.
 
 Results from ten runs each with the same parameters, `CONDITIONAL_UPDATE`, two app instances, both `doubleBooking` strategies:
 
 | Oversell | Double booking | Verdict | Oversold | Ledger | Double booked | Dup keys | Throughput (req/s) | p99 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CONDITIONAL_UPDATE | NONE | FAIL 10/10 | 0 | 0 | 23 to 30 | 0 | 1,067 to 2,380 | 412 to 922 ms |
-| CONDITIONAL_UPDATE | UNIQUE_CONSTRAINT | PASS 10/10 | 0 | 0 | 0 | 900 | 4,016 to 6,097 | 158 to 234 ms |
+| CONDITIONAL_UPDATE | NONE | FAIL 10/10 | 0 | 0 | 21 to 31 | 0 | 2,277 to 2,857 | 341 to 429 ms |
+| CONDITIONAL_UPDATE | UNIQUE_CONSTRAINT | PASS 10/10 | 0 | 0 | 0 | 900 | 5,076 to 5,917 | 159 to 190 ms |
 
 `CONDITIONAL_UPDATE` alone keeps the count right and still fails because seats overlap, and the unique index is the only layer that rejects the second reservation regardless of what the code above it did.
 
@@ -57,7 +59,9 @@ Results from five runs each with the same parameters, `CONDITIONAL_UPDATE` + `UN
 | REDIS_AS_SOT | PASS 5/5 | 0 | 0 ms | 0 / 276 to 294 | 5,291 to 5,882 | 162 to 182 ms |
 | `INVALIDATE_ON_WRITE` (raceWindowMs=200) | PASS 5/5 | 240 to 250 (5/5 runs) | 2,030 to 2,052 ms | 2 / 242 to 252 | 5,319 to 6,060 | 160 to 183 ms |
 
-`NONE` keeps the first value it saw until the TTL expires, which is after the run ends. `TTL_SHORT` bounds the window to the TTL and no lower; the TTL that closes it is zero, which is no cache. `INVALIDATE_ON_WRITE` is right until a reader that missed the cache, read the database and slept lands its stale value after the last write's delete, and then nothing deletes it again. At the default 20 ms window the hundred sales finish before the viewer's first read comes back, so that reader usually refills with zero and the race lands only in some runs (2/5 here); at 200 ms the refill straddles the last write and the stale value sticks in every run (5/5). The race is a property of the read latency against the write burst, not of the window knob, which only makes it visible. `REDIS_AS_SOT` has no second copy, so the only staleness left is the time between reading a value and looking at it, which the measurement shows as zero or one view. The cost side is the DB reads column: the shorter the window, the less the cache absorbs.
+`NONE` keeps the first value it saw until the TTL expires, which is after the run ends. `TTL_SHORT` bounds the window to the TTL and no lower; the TTL that closes it is zero, which is no cache. `INVALIDATE_ON_WRITE` is right until a reader that missed the cache, read the database and slept lands its stale value after the last write's delete, and then nothing deletes it again. At the default 20 ms window the hundred sales finish before the viewer's first read comes back, so that reader usually refills with zero and the race lands only in some runs (2/5 here, 3/5 counting a near miss); at 200 ms the refill straddles the last write and the stale value sticks in every run (5/5). The race is a property of the read latency against the write burst, not of the window knob, which only makes it visible. `REDIS_AS_SOT` has no second copy, so the only staleness left is the time between reading a value and looking at it, which the measurement shows as zero in all five runs. The cost side is the DB reads column: the shorter the window, the less the cache absorbs.
+
+One more of the five 20 ms runs showed a single phantom view 24 ms after sell-out: the refill landed and was wiped by a delete that arrived late, because sell-out is timed at the N-th OK response reaching the web tier, not at the commit. Counting that run the window opened in 3 of 5.
 
 ## Running it
 
