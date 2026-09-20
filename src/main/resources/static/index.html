@@ -1,8 +1,19 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>concurrency-ticketing-lab</title>
-<style>body{font:14px system-ui;max-width:720px;margin:2rem auto}label{display:block;margin:.4rem 0}pre{background:#f4f4f4;padding:1rem}</style>
-<h1>concurrency-ticketing-lab — M0</h1>
+<style>
+body{font:14px system-ui;max-width:720px;margin:2rem auto}
+label{display:block;margin:.4rem 0}
+pre{background:#f4f4f4;padding:1rem}
+select.hot{outline:3px solid #f80}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,12px);gap:2px;margin:1rem 0}
+#grid i{display:block;width:12px;height:12px;background:#ccc}
+#grid i.ok{background:#3a3}
+#grid i.over{background:#f80}
+#verdict{font:bold 24px system-ui;padding:.5rem 1rem;display:inline-block;color:#fff;background:#888}
+#verdict.PASS{background:#3a3}#verdict.DEGRADED{background:#ea0}#verdict.FAIL{background:#d33}
+</style>
+<h1>concurrency-ticketing-lab — M1</h1>
 <form id="f">
   <label>seatCount <input name="seatCount" type="number" value="100" min="1" max="1000"></label>
   <label>userCount <input name="userCount" type="number" value="1000" min="1" max="10000"></label>
@@ -10,26 +21,50 @@
   <label>raceWindowMs <input name="raceWindowMs" type="number" value="20" min="0" max="200"></label>
   <label>oversell
     <label><input type="radio" name="oversell" value="NONE" checked> NONE</label>
+    <label><input type="radio" name="oversell" value="LOCAL_LOCK"> LOCAL_LOCK</label>
     <label><input type="radio" name="oversell" value="CONDITIONAL_UPDATE"> CONDITIONAL_UPDATE</label>
+    <label><input type="radio" name="oversell" value="PESSIMISTIC"> PESSIMISTIC</label>
+    <label><input type="radio" name="oversell" value="OPTIMISTIC"> OPTIMISTIC</label>
   </label>
   <button>실행</button>
 </form>
-<pre id="out">대기 중</pre>
+<div id="grid"></div>
+<div id="verdict">대기 중</div>
+<pre id="out"></pre>
 <script>
-const f = document.getElementById('f'), out = document.getElementById('out');
+const f = document.getElementById('f'), grid = document.getElementById('grid'),
+      verdict = document.getElementById('verdict'), out = document.getElementById('out');
+const sel = f.querySelector('[name=appInstances]');
+
+// LOCAL_LOCK + 앱 2대: 로컬 락이 무너지는 조합을 강조
+f.onchange = () => sel.classList.toggle('hot', f.oversell.value === 'LOCAL_LOCK' && sel.value === '2');
+
+// 앞 min(ok, N)칸 초록, N 이후 초과분은 주황
+function draw(n, ok) {
+  const over = Math.max(0, ok - n);
+  grid.innerHTML = Array.from({ length: n + over }, (_, i) =>
+    `<i class="${i >= n ? 'over' : i < ok ? 'ok' : ''}"></i>`).join('');
+}
+
 f.onsubmit = async e => {
   e.preventDefault();
   f.querySelector('button').disabled = true;
   const d = Object.fromEntries(new FormData(f));
   const body = { seatCount: +d.seatCount, userCount: +d.userCount, appInstances: +d.appInstances,
                  raceWindowMs: +d.raceWindowMs, strategies: { oversell: d.oversell } };
+  draw(body.seatCount, 0);
+  verdict.className = ''; verdict.textContent = 'RUNNING'; out.textContent = '';
   const res = await fetch('/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const { runId, error } = await res.json();
   if (error) { out.textContent = error; f.querySelector('button').disabled = false; return; }
   const timer = setInterval(async () => {
     const s = await (await fetch('/api/runs/' + runId)).json();
-    out.textContent = JSON.stringify(s, null, 2);
-    if (s.status !== 'RUNNING') { clearInterval(timer); f.querySelector('button').disabled = false; }
-  }, 1000);
+    draw(body.seatCount, s.progress.ok);
+    if (s.status === 'RUNNING') return;
+    clearInterval(timer);
+    f.querySelector('button').disabled = false;
+    verdict.className = s.report?.verdict ?? ''; verdict.textContent = s.report?.verdict ?? s.status;
+    out.textContent = JSON.stringify(s.report ?? s, null, 2);
+  }, 200);
 };
 </script>
