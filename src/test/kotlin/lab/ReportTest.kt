@@ -96,4 +96,29 @@ class ReportTest {
         assertEquals(0, r.consistency.ledgerMismatch)
         assertEquals(Verdict.PASS, r.verdict)
     }
+
+    @Test
+    fun `counts phantom views after sold out and their window but leaves the verdict alone`() {
+        val views = listOf(
+            View(sentAtMs = 100, remaining = 3, fromDb = true),  // 매진 전, 정당
+            View(sentAtMs = 300, remaining = 3, fromDb = false), // phantom
+            View(sentAtMs = 450, remaining = 1, fromDb = false), // phantom, 마지막
+            View(sentAtMs = 500, remaining = 0, fromDb = true),  // 정확
+        )
+        val r = buildReport("r", spec, samples(ok = 3, soldOut = 2), remaining = 0, elapsedMs = 500, views = views, soldOutAtMs = 200)
+        assertEquals(2, r.consistency.phantomStockViews)
+        assertEquals(250, r.consistency.staleWindowMs)
+        assertEquals(4, r.performance.viewCount)
+        assertEquals(2, r.performance.viewDbReads)
+        assertEquals(Verdict.PASS, r.verdict) // stale read는 설계 선택이지 판정 조건이 아니다
+    }
+
+    @Test
+    fun `no phantom without a sold out moment`() {
+        val views = listOf(View(100, 3, true), View(300, 3, false))
+        val r = buildReport("r", spec, samples(ok = 2, soldOut = 0), remaining = 1, elapsedMs = 500, views = views)
+        assertEquals(0, r.consistency.phantomStockViews)
+        assertEquals(0, r.consistency.staleWindowMs)
+        assertEquals(2, r.performance.viewCount)
+    }
 }

@@ -54,7 +54,7 @@ class LoadRunner(
                     val t0 = System.nanoTime()
                     val res = runCatching {
                         client.post().uri("${targets[userId % targets.size]}/api/reserve")
-                            .body(ReserveRequest(eventId, userId.toLong(), seatNo, spec.strategies.oversell, spec.strategies.doubleBooking, spec.raceWindowMs))
+                            .body(ReserveRequest(eventId, userId.toLong(), seatNo, spec.strategies.oversell, spec.strategies.doubleBooking, spec.strategies.cacheConsistency, spec.raceWindowMs))
                             .retrieve().body(ReserveResponse::class.java)!!
                     }.getOrElse { ex -> log.warn("reserve failed user={} seat={}", userId, seatNo, ex); ReserveResponse(Outcome.ERROR) }
                     when (res.result) {

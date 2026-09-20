@@ -6,10 +6,12 @@ import kotlin.random.Random
 
 enum class OversellStrategy { NONE, LOCAL_LOCK, CONDITIONAL_UPDATE, PESSIMISTIC, OPTIMISTIC }
 enum class DoubleBookingStrategy { NONE, UNIQUE_CONSTRAINT }
+enum class CacheStrategy { NONE, TTL_SHORT, INVALIDATE_ON_WRITE, REDIS_AS_SOT }
 
 data class StrategySet(
     val oversell: OversellStrategy,
     val doubleBooking: DoubleBookingStrategy = DoubleBookingStrategy.NONE,
+    val cacheConsistency: CacheStrategy = CacheStrategy.NONE,
 )
 
 data class RunSpec(
@@ -37,21 +39,34 @@ data class ReserveRequest(
     val seatNo: Int,
     val strategy: OversellStrategy,
     val doubleBooking: DoubleBookingStrategy,
+    val cache: CacheStrategy,
     val raceWindowMs: Long,
 )
 data class ReserveResponse(val result: Outcome, val retries: Int = 0, val activeConnections: Int = 0)
+data class StockResponse(val remaining: Int, val fromDb: Boolean)
+
+// 조회자 한 번의 관측. sentAtMs는 예매 출발 기준 상대 ms.
+data class View(val sentAtMs: Long, val remaining: Int, val fromDb: Boolean)
 
 data class Sample(val outcome: Outcome, val latencyMs: Long, val retries: Int = 0, val activeConnections: Int = 0)
 
-// 실행 중 그리드용 카운터. Jackson은 AtomicInteger를 숫자로 직렬화한다. seats[i]는 좌석 i+1의 확정 예약 수.
+// 실행 중 그리드용 카운터. Jackson은 AtomicInteger를 숫자로 직렬화한다. seats[i]는 좌석 i+1의 확정 예약 수. lastView는 조회자가 마지막으로 본 잔여석(-1은 아직 없음).
 class Progress(seatCount: Int) {
     val ok = AtomicInteger()
     val soldOut = AtomicInteger()
     val error = AtomicInteger()
     val seats: List<AtomicInteger> = List(seatCount) { AtomicInteger() }
+    val lastView = AtomicInteger(-1)
 }
 
-data class ConsistencyMetrics(val oversoldCount: Int, val ledgerMismatch: Int, val doubleBookedSeats: Int)
+// phantomStockViews·staleWindowMs는 판정에 들어가지 않는다. stale read는 설계 선택이다.
+data class ConsistencyMetrics(
+    val oversoldCount: Int,
+    val ledgerMismatch: Int,
+    val doubleBookedSeats: Int,
+    val phantomStockViews: Int,
+    val staleWindowMs: Long,
+)
 data class PerformanceMetrics(
     val throughput: Double,
     val p50Ms: Long,
@@ -61,6 +76,8 @@ data class PerformanceMetrics(
     val retryCount: Int,
     val dbConnectionPeak: Int,
     val duplicateKeyCount: Int,
+    val viewCount: Int,
+    val viewDbReads: Int,
 )
 enum class Verdict { PASS, DEGRADED, FAIL }
 
@@ -81,14 +98,20 @@ fun buildReport(
     elapsedMs: Long,
     baselineThroughput: Double? = null,
     doubleBookedSeats: Int = 0,
+    views: List<View> = emptyList(),
+    soldOutAtMs: Long? = null,
 ): RunReport {
     val ok = samples.count { it.outcome == Outcome.OK }
     val sorted = samples.map { it.latencyMs }.sorted()
     fun pct(p: Double) = sorted[(ceil(p * sorted.size).toInt() - 1).coerceIn(0, sorted.size - 1)]
+    // 매진(N번째 OK 응답) 이후에 보낸 조회가 잔여석 > 0을 받았으면 phantom.
+    val phantom = if (soldOutAtMs == null) emptyList() else views.filter { it.sentAtMs > soldOutAtMs && it.remaining > 0 }
     val consistency = ConsistencyMetrics(
         oversoldCount = (ok - spec.seatCount).coerceAtLeast(0),
         ledgerMismatch = spec.seatCount - (ok + remaining),
         doubleBookedSeats = doubleBookedSeats,
+        phantomStockViews = phantom.size,
+        staleWindowMs = phantom.maxOfOrNull { it.sentAtMs - soldOutAtMs!! } ?: 0,
     )
     val performance = PerformanceMetrics(
         throughput = samples.size * 1000.0 / elapsedMs.coerceAtLeast(1),
@@ -97,6 +120,8 @@ fun buildReport(
         retryCount = samples.sumOf { it.retries },
         dbConnectionPeak = samples.maxOfOrNull { it.activeConnections } ?: 0,
         duplicateKeyCount = samples.count { it.outcome == Outcome.DUPLICATE_KEY },
+        viewCount = views.size,
+        viewDbReads = views.count { it.fromDb },
     )
     val consistent = consistency.oversoldCount == 0 && consistency.ledgerMismatch == 0 && consistency.doubleBookedSeats == 0
     val verdict = when {
