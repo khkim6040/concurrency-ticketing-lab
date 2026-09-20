@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>concurrency-ticketing-lab</title>
+<style>body{font:14px system-ui;max-width:720px;margin:2rem auto}label{display:block;margin:.4rem 0}pre{background:#f4f4f4;padding:1rem}</style>
+<h1>concurrency-ticketing-lab — M0</h1>
+<form id="f">
+  <label>seatCount <input name="seatCount" type="number" value="100" min="1" max="1000"></label>
+  <label>userCount <input name="userCount" type="number" value="1000" min="1" max="10000"></label>
+  <label>appInstances <select name="appInstances"><option>1</option><option selected>2</option></select></label>
+  <label>raceWindowMs <input name="raceWindowMs" type="number" value="20" min="0" max="200"></label>
+  <label>oversell
+    <label><input type="radio" name="oversell" value="NONE" checked> NONE</label>
+    <label><input type="radio" name="oversell" value="CONDITIONAL_UPDATE"> CONDITIONAL_UPDATE</label>
+  </label>
+  <button>실행</button>
+</form>
+<pre id="out">대기 중</pre>
+<script>
+const f = document.getElementById('f'), out = document.getElementById('out');
+f.onsubmit = async e => {
+  e.preventDefault();
+  f.querySelector('button').disabled = true;
+  const d = Object.fromEntries(new FormData(f));
+  const body = { seatCount: +d.seatCount, userCount: +d.userCount, appInstances: +d.appInstances,
+                 raceWindowMs: +d.raceWindowMs, strategies: { oversell: d.oversell } };
+  const res = await fetch('/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const { runId, error } = await res.json();
+  if (error) { out.textContent = error; f.querySelector('button').disabled = false; return; }
+  const timer = setInterval(async () => {
+    const s = await (await fetch('/api/runs/' + runId)).json();
+    out.textContent = JSON.stringify(s, null, 2);
+    if (s.status !== 'RUNNING') { clearInterval(timer); f.querySelector('button').disabled = false; }
+  }, 1000);
+};
+</script>
