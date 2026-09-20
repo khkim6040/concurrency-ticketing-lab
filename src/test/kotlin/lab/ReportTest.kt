@@ -45,4 +45,35 @@ class ReportTest {
             RunSpec(seatCount = 0, userCount = 1, strategies = StrategySet(OversellStrategy.NONE))
         }
     }
+
+    @Test
+    fun `sums retries and takes connection peak`() {
+        val s = listOf(
+            Sample(Outcome.OK, 1, retries = 2, activeConnections = 5),
+            Sample(Outcome.SOLD_OUT, 1, retries = 3, activeConnections = 20),
+            Sample(Outcome.ERROR, 1),
+        )
+        val r = buildReport("r", spec, s, remaining = 2, elapsedMs = 100)
+        assertEquals(5, r.performance.retryCount)
+        assertEquals(20, r.performance.dbConnectionPeak)
+    }
+
+    @Test
+    fun `degraded when throughput at most half of baseline`() {
+        // 5 req / 0.5 s = 10 rps
+        val degraded = buildReport("r", spec, samples(ok = 3, soldOut = 2), remaining = 0, elapsedMs = 500, baselineThroughput = 20.0)
+        assertEquals(Verdict.DEGRADED, degraded.verdict)
+        assertEquals(20.0, degraded.baselineThroughput)
+        val pass = buildReport("r", spec, samples(ok = 3, soldOut = 2), remaining = 0, elapsedMs = 500, baselineThroughput = 19.0)
+        assertEquals(Verdict.PASS, pass.verdict)
+        val noBaseline = buildReport("r", spec, samples(ok = 3, soldOut = 2), remaining = 0, elapsedMs = 500)
+        assertEquals(Verdict.PASS, noBaseline.verdict)
+        assertEquals(null, noBaseline.baselineThroughput)
+    }
+
+    @Test
+    fun `fail beats degraded`() {
+        val r = buildReport("r", spec, samples(ok = 5, soldOut = 0), remaining = 0, elapsedMs = 1000, baselineThroughput = 100.0)
+        assertEquals(Verdict.FAIL, r.verdict)
+    }
 }
