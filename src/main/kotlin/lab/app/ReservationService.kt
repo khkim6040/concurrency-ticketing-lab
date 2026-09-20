@@ -1,9 +1,12 @@
 package lab.app
 
+import lab.DoubleBookingStrategy
 import lab.Outcome
 import lab.OversellStrategy
+import lab.ReserveRequest
 import lab.ReserveResponse
 import org.springframework.context.annotation.Profile
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -13,7 +16,40 @@ import org.springframework.transaction.support.TransactionTemplate
 class ReservationService(private val jdbc: JdbcClient, private val tx: TransactionTemplate) {
     private val localLock = Any() // ponytail: 전역 락. 실행당 이벤트가 하나라 이벤트별 락과 결과가 같다.
 
-    fun reserve(eventId: Long, strategy: OversellStrategy, raceWindowMs: Long): ReserveResponse = when (strategy) {
+    // 좌석 먼저, 카운터 나중. 좌석을 잡은 요청만 카운터를 차감하고, 카운터가 OK가 아니면 자기 행을 되돌린다.
+    fun reserve(req: ReserveRequest): ReserveResponse {
+        takeSeat(req)?.let { return ReserveResponse(it) }
+        val res = counter(req.eventId, req.strategy, req.raceWindowMs)
+        if (res.result != Outcome.OK) {
+            jdbc.sql("DELETE FROM reservation WHERE event_id = :e AND seat_no = :s AND user_id = :u")
+                .param("e", req.eventId).param("s", req.seatNo).param("u", req.userId).update()
+        }
+        return res
+    }
+
+    // 좌석 단계. 잡았으면 null, 거절이면 그 Outcome. 락도 트랜잭션도 없다.
+    private fun takeSeat(req: ReserveRequest): Outcome? {
+        val insert = jdbc.sql("INSERT INTO reservation (event_id, seat_no, user_id) VALUES (:e, :s, :u)")
+            .param("e", req.eventId).param("s", req.seatNo).param("u", req.userId)
+        return when (req.doubleBooking) {
+            DoubleBookingStrategy.NONE -> {
+                val taken = jdbc.sql("SELECT COUNT(*) FROM reservation WHERE event_id = :e AND seat_no = :s")
+                    .param("e", req.eventId).param("s", req.seatNo).query(Long::class.javaObjectType).single() > 0
+                if (taken) return Outcome.SEAT_TAKEN
+                Thread.sleep(req.raceWindowMs) // 경합 창 확대: 조회와 INSERT 사이
+                insert.update()
+                null
+            }
+            DoubleBookingStrategy.UNIQUE_CONSTRAINT -> try {
+                insert.update()
+                null
+            } catch (e: DuplicateKeyException) {
+                Outcome.DUPLICATE_KEY
+            }
+        }
+    }
+
+    private fun counter(eventId: Long, strategy: OversellStrategy, raceWindowMs: Long): ReserveResponse = when (strategy) {
         OversellStrategy.NONE -> readSleepWrite(eventId, raceWindowMs)
         OversellStrategy.LOCAL_LOCK -> synchronized(localLock) { readSleepWrite(eventId, raceWindowMs) }
         OversellStrategy.CONDITIONAL_UPDATE -> {

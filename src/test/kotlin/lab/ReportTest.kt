@@ -76,4 +76,24 @@ class ReportTest {
         val r = buildReport("r", spec, samples(ok = 5, soldOut = 0), remaining = 0, elapsedMs = 1000, baselineThroughput = 100.0)
         assertEquals(Verdict.FAIL, r.verdict)
     }
+
+    @Test
+    fun `fail when a seat is double booked`() {
+        val r = buildReport("r", spec, samples(ok = 3, soldOut = 2), remaining = 0, elapsedMs = 500, doubleBookedSeats = 1)
+        assertEquals(1, r.consistency.doubleBookedSeats)
+        assertEquals(0, r.consistency.oversoldCount)
+        assertEquals(Verdict.FAIL, r.verdict)
+    }
+
+    @Test
+    fun `counts duplicate key rejections and ignores seat rejections in the ledger`() {
+        val s = samples(ok = 3, soldOut = 0) +
+            List(2) { Sample(Outcome.DUPLICATE_KEY, 1) } +
+            listOf(Sample(Outcome.SEAT_TAKEN, 1))
+        val r = buildReport("r", spec, s, remaining = 0, elapsedMs = 100)
+        assertEquals(2, r.performance.duplicateKeyCount)
+        assertEquals(0, r.consistency.oversoldCount)
+        assertEquals(0, r.consistency.ledgerMismatch)
+        assertEquals(Verdict.PASS, r.verdict)
+    }
 }

@@ -29,7 +29,7 @@ class RunController(private val runner: LoadRunner) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("error" to "run in progress"))
         }
         val runId = UUID.randomUUID().toString()
-        val progress = Progress()
+        val progress = Progress(spec.seatCount)
         runs[runId] = RunState("RUNNING", progress)
         Thread.startVirtualThread {
             try {

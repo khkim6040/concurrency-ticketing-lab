@@ -18,7 +18,7 @@ class ReserveController(private val service: ReservationService, private val dat
     @PostMapping("/api/reserve")
     fun reserve(@RequestBody req: ReserveRequest): ReserveResponse {
         val before = active()
-        val res = service.reserve(req.eventId, req.strategy, req.raceWindowMs)
+        val res = service.reserve(req)
         return res.copy(activeConnections = maxOf(before, active()))
     }
 }

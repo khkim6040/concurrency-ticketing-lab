@@ -5,8 +5,12 @@ import kotlin.math.ceil
 import kotlin.random.Random
 
 enum class OversellStrategy { NONE, LOCAL_LOCK, CONDITIONAL_UPDATE, PESSIMISTIC, OPTIMISTIC }
+enum class DoubleBookingStrategy { NONE, UNIQUE_CONSTRAINT }
 
-data class StrategySet(val oversell: OversellStrategy)
+data class StrategySet(
+    val oversell: OversellStrategy,
+    val doubleBooking: DoubleBookingStrategy = DoubleBookingStrategy.NONE,
+)
 
 data class RunSpec(
     val seatCount: Int,
@@ -24,21 +28,30 @@ data class RunSpec(
     }
 }
 
-enum class Outcome { OK, SOLD_OUT, ERROR }
+// SEAT_TAKEN은 앱 조회로 거절, DUPLICATE_KEY는 DB 유니크 인덱스가 거절. 둘 다 카운터를 건드리지 않는다.
+enum class Outcome { OK, SOLD_OUT, SEAT_TAKEN, DUPLICATE_KEY, ERROR }
 
-data class ReserveRequest(val eventId: Long, val userId: Long, val strategy: OversellStrategy, val raceWindowMs: Long)
+data class ReserveRequest(
+    val eventId: Long,
+    val userId: Long,
+    val seatNo: Int,
+    val strategy: OversellStrategy,
+    val doubleBooking: DoubleBookingStrategy,
+    val raceWindowMs: Long,
+)
 data class ReserveResponse(val result: Outcome, val retries: Int = 0, val activeConnections: Int = 0)
 
 data class Sample(val outcome: Outcome, val latencyMs: Long, val retries: Int = 0, val activeConnections: Int = 0)
 
-// 실행 중 그리드용 카운터. Jackson은 AtomicInteger를 숫자로 직렬화한다.
-data class Progress(
-    val ok: AtomicInteger = AtomicInteger(),
-    val soldOut: AtomicInteger = AtomicInteger(),
-    val error: AtomicInteger = AtomicInteger(),
-)
+// 실행 중 그리드용 카운터. Jackson은 AtomicInteger를 숫자로 직렬화한다. seats[i]는 좌석 i+1의 확정 예약 수.
+class Progress(seatCount: Int) {
+    val ok = AtomicInteger()
+    val soldOut = AtomicInteger()
+    val error = AtomicInteger()
+    val seats: List<AtomicInteger> = List(seatCount) { AtomicInteger() }
+}
 
-data class ConsistencyMetrics(val oversoldCount: Int, val ledgerMismatch: Int)
+data class ConsistencyMetrics(val oversoldCount: Int, val ledgerMismatch: Int, val doubleBookedSeats: Int)
 data class PerformanceMetrics(
     val throughput: Double,
     val p50Ms: Long,
@@ -47,6 +60,7 @@ data class PerformanceMetrics(
     val errorCount: Int,
     val retryCount: Int,
     val dbConnectionPeak: Int,
+    val duplicateKeyCount: Int,
 )
 enum class Verdict { PASS, DEGRADED, FAIL }
 
@@ -66,6 +80,7 @@ fun buildReport(
     remaining: Int,
     elapsedMs: Long,
     baselineThroughput: Double? = null,
+    doubleBookedSeats: Int = 0,
 ): RunReport {
     val ok = samples.count { it.outcome == Outcome.OK }
     val sorted = samples.map { it.latencyMs }.sorted()
@@ -73,6 +88,7 @@ fun buildReport(
     val consistency = ConsistencyMetrics(
         oversoldCount = (ok - spec.seatCount).coerceAtLeast(0),
         ledgerMismatch = spec.seatCount - (ok + remaining),
+        doubleBookedSeats = doubleBookedSeats,
     )
     val performance = PerformanceMetrics(
         throughput = samples.size * 1000.0 / elapsedMs.coerceAtLeast(1),
@@ -80,8 +96,9 @@ fun buildReport(
         errorCount = samples.count { it.outcome == Outcome.ERROR },
         retryCount = samples.sumOf { it.retries },
         dbConnectionPeak = samples.maxOfOrNull { it.activeConnections } ?: 0,
+        duplicateKeyCount = samples.count { it.outcome == Outcome.DUPLICATE_KEY },
     )
-    val consistent = consistency.oversoldCount == 0 && consistency.ledgerMismatch == 0
+    val consistent = consistency.oversoldCount == 0 && consistency.ledgerMismatch == 0 && consistency.doubleBookedSeats == 0
     val verdict = when {
         !consistent -> Verdict.FAIL
         baselineThroughput != null && performance.throughput <= baselineThroughput * 0.5 -> Verdict.DEGRADED
