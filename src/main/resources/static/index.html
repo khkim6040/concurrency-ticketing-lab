@@ -10,10 +10,11 @@ select.hot{outline:3px solid #f80}
 #grid i{display:block;width:12px;height:12px;background:#ccc}
 #grid i.ok{background:#3a3}
 #grid i.over{background:#f80}
+#grid i.dup{background:#d33}
 #verdict{font:bold 24px system-ui;padding:.5rem 1rem;display:inline-block;color:#fff;background:#888}
 #verdict.PASS{background:#3a3}#verdict.DEGRADED{background:#ea0}#verdict.FAIL{background:#d33}
 </style>
-<h1>concurrency-ticketing-lab — M1</h1>
+<h1>concurrency-ticketing-lab — M2</h1>
 <form id="f">
   <label>seatCount <input name="seatCount" type="number" value="100" min="1" max="1000"></label>
   <label>userCount <input name="userCount" type="number" value="1000" min="1" max="10000"></label>
@@ -25,6 +26,10 @@ select.hot{outline:3px solid #f80}
     <label><input type="radio" name="oversell" value="CONDITIONAL_UPDATE"> CONDITIONAL_UPDATE</label>
     <label><input type="radio" name="oversell" value="PESSIMISTIC"> PESSIMISTIC</label>
     <label><input type="radio" name="oversell" value="OPTIMISTIC"> OPTIMISTIC</label>
+  </label>
+  <label>doubleBooking
+    <label><input type="radio" name="doubleBooking" value="NONE" checked> NONE</label>
+    <label><input type="radio" name="doubleBooking" value="UNIQUE_CONSTRAINT"> UNIQUE_CONSTRAINT</label>
   </label>
   <button>실행</button>
 </form>
@@ -39,11 +44,11 @@ const sel = f.querySelector('[name=appInstances]');
 // LOCAL_LOCK + 앱 2대: 로컬 락이 무너지는 조합을 강조
 f.onchange = () => sel.classList.toggle('hot', f.oversell.value === 'LOCAL_LOCK' && sel.value === '2');
 
-// 앞 min(ok, N)칸 초록, N 이후 초과분은 주황
-function draw(n, ok) {
+// 칸 i = 좌석 i+1. seats[i]가 0이면 회색, 1이면 초록, 2 이상이면 빨강(중복 배정). N을 넘는 판매분은 주황 칸으로 뒤에 붙인다.
+function draw(n, ok, seats) {
   const over = Math.max(0, ok - n);
   grid.innerHTML = Array.from({ length: n + over }, (_, i) =>
-    `<i class="${i >= n ? 'over' : i < ok ? 'ok' : ''}"></i>`).join('');
+    `<i class="${i >= n ? 'over' : (seats[i] ?? 0) >= 2 ? 'dup' : seats[i] === 1 ? 'ok' : ''}"></i>`).join('');
 }
 
 f.onsubmit = async e => {
@@ -51,15 +56,15 @@ f.onsubmit = async e => {
   f.querySelector('button').disabled = true;
   const d = Object.fromEntries(new FormData(f));
   const body = { seatCount: +d.seatCount, userCount: +d.userCount, appInstances: +d.appInstances,
-                 raceWindowMs: +d.raceWindowMs, strategies: { oversell: d.oversell } };
-  draw(body.seatCount, 0);
+                 raceWindowMs: +d.raceWindowMs, strategies: { oversell: d.oversell, doubleBooking: d.doubleBooking } };
+  draw(body.seatCount, 0, []);
   verdict.className = ''; verdict.textContent = 'RUNNING'; out.textContent = '';
   const res = await fetch('/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const { runId, error } = await res.json();
   if (error) { out.textContent = error; f.querySelector('button').disabled = false; return; }
   const timer = setInterval(async () => {
     const s = await (await fetch('/api/runs/' + runId)).json();
-    draw(body.seatCount, s.progress.ok);
+    draw(body.seatCount, s.progress.ok, s.progress.seats);
     if (s.status === 'RUNNING') return;
     clearInterval(timer);
     f.querySelector('button').disabled = false;
