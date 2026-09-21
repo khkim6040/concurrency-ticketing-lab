@@ -52,7 +52,7 @@
   - `label(key, lang) → string` — 지표 이름. `verdict`는 키 없이, 나머지는 `"이름 (key)"`
   - `T: { en: {...}, ko: {...} }` — `run`, `copy`, `copied`, `prev`, `cur`, `diff`, `viewer(v, a)`, `stale`, `reason.{PASS,DEGRADED,FAIL}`, `metric.{key}`
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `src/test/js/ui.test.mjs`:
 
@@ -132,12 +132,12 @@ test('T has the same keys in both languages', () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `node --test src/test/js/ui.test.mjs`
 Expected: `Cannot find module '.../static/lib.js'`로 실패.
 
-- [ ] **Step 3: `lib.js` 작성**
+- [x] **Step 3: `lib.js` 작성**
 
 `src/main/resources/static/lib.js`:
 
@@ -234,12 +234,12 @@ export function verdictReason(r, lang) {
 }
 ```
 
-- [ ] **Step 4: 통과 확인**
+- [x] **Step 4: 통과 확인**
 
 Run: `node --test src/test/js/ui.test.mjs`
 Expected: 9 tests pass, 0 fail.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/main/resources/static/lib.js src/test/js/ui.test.mjs
@@ -258,7 +258,7 @@ git commit -m "feat: add UI pure functions for share links, comparison and i18n"
 - Consumes: Task 1의 `lib.js` export 전부.
 - Produces: DOM id `f`, `lang`, `random`, `hot`, `legend`, `stock`, `grid`, `verdict`, `copy`, `reason`, `cmp`. 라디오는 `.opt` 안에 `<label><input></label> <details>` 순서. Task 3의 녹화 스크립트가 `#verdict` 텍스트와 `[name=oversell][value=…]` 셀렉터, `form button:not([type])`에 의존한다.
 
-- [ ] **Step 1: `index.html` 작성**
+- [x] **Step 1: `index.html` 작성**
 
 전체를 아래로 바꾼다.
 
@@ -498,7 +498,7 @@ if (linked) { fillForm(linked); f.requestSubmit(); }
 </script>
 ```
 
-- [ ] **Step 2: 컨트롤러 주석 삭제**
+- [x] **Step 2: 컨트롤러 주석 삭제**
 
 `src/main/kotlin/lab/web/RunController.kt`에서
 
@@ -514,12 +514,12 @@ if (linked) { fillForm(linked); f.requestSubmit(); }
 
 로 바꾼다.
 
-- [ ] **Step 3: 빌드와 기존 테스트**
+- [x] **Step 3: 빌드와 기존 테스트**
 
 Run: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew test -q && node --test src/test/js/ui.test.mjs`
 Expected: 둘 다 통과.
 
-- [ ] **Step 4: 스택을 올리고 브라우저로 확인**
+- [x] **Step 4: 스택을 올리고 브라우저로 확인**
 
 Run: `docker compose up -d --build` 후 `curl -s http://localhost:8080/lib.js | head -3`로 모듈이 서빙되는지 본다(`// 브라우저(index.html)와 ...` 첫 줄).
 
@@ -531,7 +531,7 @@ Run: `docker compose up -d --build` 후 `curl -s http://localhost:8080/lib.js | 
 4. `CONDITIONAL_UPDATE` + `UNIQUE_CONSTRAINT`로 바꾸고 Run(시드 유지): 표에 `previous / current / diff` 세 열, `oversell`·`doubleBooking` 행이 굵게, 처리량 행에 `(+NN%)`. 표의 `seed` 행은 두 열이 같다.
 5. 3의 주소를 새 탭에 붙여 넣으면 폼이 채워지고 자동 실행된다. `?seed=abc`처럼 깨진 링크는 기본 폼을 보이고 실행하지 않는다.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/main/resources/static/index.html src/main/kotlin/lab/web/RunController.kt
@@ -550,7 +550,7 @@ git commit -m "feat: share links, run comparison and bilingual strategy notes in
 - Consumes: Task 2의 DOM(`#verdict` 텍스트, `[name=oversell][value=…]`, `form button:not([type])`, `#cmp`).
 - Produces: `docs/demo.gif`. README(Task 4)가 같은 링크를 예시로 쓴다.
 
-- [ ] **Step 1: 셸 스크립트**
+- [x] **Step 1: 셸 스크립트**
 
 `scripts/demo-gif.sh`:
 
@@ -575,7 +575,7 @@ ls -l "$HERE/../docs/demo.gif"
 
 `chmod +x scripts/demo-gif.sh`.
 
-- [ ] **Step 2: Node 스크립트**
+- [x] **Step 2: Node 스크립트**
 
 `scripts/demo-gif.mjs`:
 
@@ -608,14 +608,14 @@ await page.close();
 await browser.close();
 ```
 
-- [ ] **Step 3: 실행**
+- [x] **Step 3: 실행**
 
 Run: `docker compose ps`로 스택이 떠 있는지 본 뒤 `./scripts/demo-gif.sh`
 Expected: 마지막 줄에 `docs/demo.gif` 크기(수백 KB에서 2 MB 사이). `open docs/demo.gif`로 확인: 영어 UI, 첫 실행 `FAIL`, 두 번째 실행 `PASS`, 비교 표에 `oversell`·`doubleBooking` 행이 굵고 `Oversold` 행의 `diff`가 음수.
 
 `npm install`이나 `playwright install`이 네트워크로 실패하면 오류를 그대로 보고하고 멈춘다. GIF가 5 MB를 넘으면 `fps=8`로 낮춘다.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add scripts/demo-gif.sh scripts/demo-gif.mjs docs/demo.gif
@@ -630,7 +630,7 @@ git commit -m "feat: add demo GIF recorder and the recorded demo"
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-09-21-m4-compare-share.md` (체크박스)
 
-- [ ] **Step 1: README 갱신**
+- [x] **Step 1: README 갱신**
 
 `README.md`를 다음과 같이 고친다.
 
@@ -684,11 +684,11 @@ http://localhost:8080/?seatCount=100&userCount=1000&appInstances=2&raceWindowMs=
 - [M4 design](docs/superpowers/specs/2026-09-21-m4-design.md) and [M4 implementation plan](docs/superpowers/plans/2026-09-21-m4-compare-share.md) (Korean)
 ```
 
-- [ ] **Step 2: 계획 체크박스**
+- [x] **Step 2: 계획 체크박스**
 
 이 파일의 완료한 `- [ ]`를 `- [x]`로 바꾼다.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add README.md docs/superpowers/plans/2026-09-21-m4-compare-share.md

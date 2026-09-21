@@ -4,7 +4,9 @@ A simulator that lets you switch race conditions in a ticket booking system on a
 
 The whole point is one claim: the more consistency you enforce, the less throughput you get. If turning every defense on looked like the right answer, the tool would be teaching the wrong lesson, so both axes are always shown side by side.
 
-## What works today (M0 + M1 + M2 + M3)
+![Two runs with the same seed: oversell NONE fails, CONDITIONAL_UPDATE with a unique index passes, compared side by side](docs/demo.gif)
+
+## What works today (M0 to M4)
 
 - Two app servers and MySQL, started with Docker Compose. With a single server every problem here can be solved by a JVM lock, which is exactly the wrong lesson, so two is the minimum.
 - A `raceWindowMs` knob that sleeps between the read and the write to widen the race window on purpose. Without it, oversell shows up in some runs and not others, which is useless for teaching.
@@ -63,6 +65,10 @@ Results from five runs each with the same parameters, `CONDITIONAL_UPDATE` + `UN
 
 One more of the five 20 ms runs showed a single phantom view 24 ms after sell-out: the refill landed and was wiped by a delete that arrived late, because sell-out is timed at the N-th OK response reaching the web tier, not at the commit. Counting that run the window opened in 3 of 5.
 
+- Share links. The address bar becomes `?seatCount=…&seed=…&oversell=…` after every run, and opening such a link fills the form and runs it. The seed fixes which seat each user picks, so the link reproduces the experiment; the oversold count and the throughput still depend on timing and vary from run to run. The seed field keeps its value after a run, so pressing Run again replays the same seed.
+- A comparison table. The browser remembers the previous run and shows previous, current and diff columns, with the parameters that changed in bold. Run `NONE` first, change one strategy, run again, and the throughput cost of that strategy is one row.
+- A "why?" note next to every strategy, two or three sentences each, collapsed until a run finishes and then opened for the strategies that ran. The UI is English by default with a Korean toggle; strategy names, field names and metric keys stay as they are in the code.
+
 ## Running it
 
 You need JDK 21 and Docker.
@@ -70,10 +76,17 @@ You need JDK 21 and Docker.
 ```bash
 docker compose up -d --build
 open http://localhost:8080      # parameter form and results
-./scripts/dod.sh                # reproduces the table above
+./scripts/dod.sh                # reproduces the tables above
+./scripts/demo-gif.sh           # re-records docs/demo.gif (needs Node and ffmpeg)
 ```
 
-`./gradlew test` runs the unit tests without Docker.
+`./gradlew test` runs the unit tests and `node --test src/test/js/ui.test.mjs` the UI functions, both without Docker.
+
+A link that reproduces the second half of the GIF on your own stack:
+
+```
+http://localhost:8080/?seatCount=100&userCount=1000&appInstances=2&raceWindowMs=20&seed=42&oversell=CONDITIONAL_UPDATE&doubleBooking=UNIQUE_CONSTRAINT&cacheConsistency=NONE
+```
 
 ## API
 
@@ -105,6 +118,8 @@ src/main/kotlin/lab/
   app/ReserveController.kt  POST /api/reserve
   web/LoadRunner.kt         simultaneous start, result collection
   web/RunController.kt      POST /api/runs, GET /api/runs/{id}
+  static/index.html         form, seat grid, comparison table, bilingual notes
+  static/lib.js             share-link encoding, comparison rows, verdict reason, strings; also run by node --test
 db/schema.sql               MySQL initdb
 scripts/dod.sh              reproducibility check
 ```
@@ -115,7 +130,7 @@ scripts/dod.sh              reproducibility check
 - [x] M1 LOCAL_LOCK / PESSIMISTIC / OPTIMISTIC, one-vs-two instance toggle, performance metrics, seat grid
 - [x] M2 Double booking. `reservation` table, unique index toggled at runtime
 - [x] M3 Cache layer. Redis, four stale-read strategies, `phantomStockViews`
-- [ ] M4 Side-by-side comparison, seed-based share links, per-strategy explanations
+- [x] M4 Side-by-side comparison, seed-based share links, per-strategy explanations
 
 ## Documents
 
@@ -125,3 +140,4 @@ scripts/dod.sh              reproducibility check
 - [M1 design](docs/superpowers/specs/2026-09-20-m1-design.md) and [M1 implementation plan](docs/superpowers/plans/2026-09-20-m1-strategies.md) (Korean)
 - [M2 design](docs/superpowers/specs/2026-09-20-m2-design.md) and [M2 implementation plan](docs/superpowers/plans/2026-09-20-m2-double-booking.md) (Korean)
 - [M3 design](docs/superpowers/specs/2026-09-20-m3-design.md) and [M3 implementation plan](docs/superpowers/plans/2026-09-20-m3-cache-layer.md) (Korean)
+- [M4 design](docs/superpowers/specs/2026-09-21-m4-design.md) and [M4 implementation plan](docs/superpowers/plans/2026-09-21-m4-compare-share.md) (Korean)
