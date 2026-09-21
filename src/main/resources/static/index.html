@@ -1,76 +1,159 @@
 <!doctype html>
+<html lang="en">
 <meta charset="utf-8">
 <title>concurrency-ticketing-lab</title>
 <style>
 body{font:14px system-ui;max-width:720px;margin:2rem auto}
+html[lang=en] [lang=ko],html[lang=ko] [lang=en]{display:none}
+h1{display:flex;justify-content:space-between;align-items:baseline}
+#lang{font:13px system-ui}
 label{display:block;margin:.4rem 0}
-pre{background:#f4f4f4;padding:1rem}
+small{color:#666}
+fieldset{border:1px solid #ddd;margin:.6rem 0;padding:.4rem .8rem}
+.opt{margin:.3rem 0}
+.opt label{display:inline}
+details{display:inline;font-size:13px;color:#444}
+summary{cursor:pointer;color:#06c;display:inline;margin-left:.4rem}
+details p{margin:.2rem 0 .4rem 1.4rem}
 select.hot{outline:3px solid #f80}
-#grid{display:grid;grid-template-columns:repeat(auto-fill,12px);gap:2px;margin:1rem 0}
-#grid i{display:block;width:12px;height:12px;background:#ccc}
-#grid i.ok{background:#3a3}
-#grid i.over{background:#f80}
-#grid i.dup{background:#d33}
+#hot{display:none;color:#f80;margin-left:.6rem}
+#hot.on{display:inline}
+#legend{margin:1rem 0 0}
+#legend span{margin-right:1rem}
+#legend i,#grid i{display:inline-block;width:12px;height:12px;background:#ccc;vertical-align:middle}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,12px);gap:2px;margin:.5rem 0 1rem}
+#grid i{display:block}
+i.ok{background:#3a3!important}i.over{background:#f80!important}i.dup{background:#d33!important}
 #verdict{font:bold 24px system-ui;padding:.5rem 1rem;display:inline-block;color:#fff;background:#888}
 #verdict.PASS{background:#3a3}#verdict.DEGRADED{background:#ea0}#verdict.FAIL{background:#d33}
+#copy{display:none;margin-left:1rem}
+#reason{margin:.4rem 0}
 #stock{margin:.5rem 0;font-weight:bold}
-#note{font-size:13px;color:#444;border-top:1px solid #ddd;padding-top:.5rem;margin-top:1rem}
-#note li{margin:.2rem 0}
+#stale{color:#d33}
+table{border-collapse:collapse;margin-top:1rem;font-size:13px}
+td,th{border:1px solid #ddd;padding:.2rem .5rem;text-align:right}
+th:first-child,td:first-child{text-align:left}
+tr.changed td{font-weight:bold;background:#fff3e0}
 </style>
-<h1>concurrency-ticketing-lab — M3</h1>
+<h1>concurrency-ticketing-lab <button id="lang" type="button">한국어</button></h1>
 <form id="f">
-  <label>seatCount <input name="seatCount" type="number" value="100" min="1" max="1000"></label>
-  <label>userCount <input name="userCount" type="number" value="1000" min="1" max="10000"></label>
-  <label>appInstances <select name="appInstances"><option>1</option><option selected>2</option></select></label>
-  <label>raceWindowMs <input name="raceWindowMs" type="number" value="20" min="0" max="200"></label>
-  <label>oversell
-    <label><input type="radio" name="oversell" value="NONE" checked> NONE</label>
-    <label><input type="radio" name="oversell" value="LOCAL_LOCK"> LOCAL_LOCK</label>
-    <label><input type="radio" name="oversell" value="CONDITIONAL_UPDATE"> CONDITIONAL_UPDATE</label>
-    <label><input type="radio" name="oversell" value="PESSIMISTIC"> PESSIMISTIC</label>
-    <label><input type="radio" name="oversell" value="OPTIMISTIC"> OPTIMISTIC</label>
-  </label>
-  <label>doubleBooking
-    <label><input type="radio" name="doubleBooking" value="NONE" checked> NONE</label>
-    <label><input type="radio" name="doubleBooking" value="UNIQUE_CONSTRAINT"> UNIQUE_CONSTRAINT</label>
-  </label>
-  <label>cacheConsistency
-    <label><input type="radio" name="cacheConsistency" value="NONE" checked> NONE</label>
-    <label><input type="radio" name="cacheConsistency" value="TTL_SHORT"> TTL_SHORT</label>
-    <label><input type="radio" name="cacheConsistency" value="INVALIDATE_ON_WRITE"> INVALIDATE_ON_WRITE</label>
-    <label><input type="radio" name="cacheConsistency" value="REDIS_AS_SOT"> REDIS_AS_SOT</label>
-  </label>
-  <button>실행</button>
+  <label>seatCount <input name="seatCount" type="number" value="100" min="1" max="1000">
+    <small><span lang="en">seats N</span><span lang="ko">좌석 수 N</span></small></label>
+  <label>userCount <input name="userCount" type="number" value="1000" min="1" max="10000">
+    <small><span lang="en">concurrent users M</span><span lang="ko">동시 사용자 M</span></small></label>
+  <label>appInstances <select name="appInstances"><option>1</option><option selected>2</option></select>
+    <span id="hot"><span lang="en">a JVM lock is per instance; two instances race each other</span><span lang="ko">JVM 락은 인스턴스마다 따로라 2대에서는 서로 경쟁한다</span></span>
+    <small><span lang="en">app servers</span><span lang="ko">앱 서버 대수</span></small></label>
+  <label>raceWindowMs <input name="raceWindowMs" type="number" value="20" min="0" max="200">
+    <small><span lang="en">delay injected between read and write</span><span lang="ko">읽기와 쓰기 사이에 넣는 지연</span></small></label>
+  <label>seed <input name="seed" type="number" step="1" placeholder="random">
+    <button type="button" id="random"><span lang="en">Random</span><span lang="ko">랜덤</span></button>
+    <small><span lang="en">same seed = same seat picks; kept after a run, so Run again replays it</span><span lang="ko">같은 시드 = 같은 좌석 선택. 실행 뒤에도 남으므로 다시 실행하면 같은 시드로 돈다</span></small></label>
+
+  <fieldset><legend>oversell <small><span lang="en">sells more tickets than seats</span><span lang="ko">좌석보다 표를 더 파는 문제</span></small></legend>
+    <div class="opt"><label><input type="radio" name="oversell" value="NONE" checked> NONE</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">Read the count, sleep, write count minus one. Another request reads the same value in between and both write the same result, so one sale is lost from the ledger. This is a lost update.</p>
+        <p lang="ko">잔여석을 읽고, 잠들고, 하나 뺀 값을 쓴다. 그 사이 다른 요청이 같은 값을 읽어 둘 다 같은 결과를 쓰므로 판매 하나가 원장에서 사라진다. lost update다.</p></details></div>
+    <div class="opt"><label><input type="radio" name="oversell" value="LOCAL_LOCK"> LOCAL_LOCK</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">A ReentrantLock in the JVM serializes requests, so one instance balances the counter exactly. Two instances each serialize only their own half and the halves race each other, so it oversells almost as badly as NONE while paying the lock's latency.</p>
+        <p lang="ko">JVM 안의 ReentrantLock이 요청을 직렬화하므로 앱 1대면 카운터가 정확히 맞는다. 2대면 각자 자기 절반만 직렬화하고 두 절반이 서로 경쟁해, 락의 지연은 치르면서 NONE만큼 오버셀한다.</p></details></div>
+    <div class="opt"><label><input type="radio" name="oversell" value="CONDITIONAL_UPDATE"> CONDITIONAL_UPDATE</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0. The database checks and decrements in one statement, so there is no window to sleep in. Exact without a lock, and the fastest of the consistent strategies.</p>
+        <p lang="ko">UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0. DB가 한 문장 안에서 검사하고 차감하므로 잠들 틈이 없다. 락 없이 정확하고, 정합한 전략 중 가장 빠르다.</p></details></div>
+    <div class="opt"><label><input type="radio" name="oversell" value="PESSIMISTIC"> PESSIMISTIC</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">SELECT ... FOR UPDATE locks the row for the whole transaction, sleep included. Exact, but every waiting transaction holds a connection, so the pool size becomes the throughput ceiling and p99 climbs to seconds.</p>
+        <p lang="ko">SELECT ... FOR UPDATE가 트랜잭션 내내, 잠드는 동안에도 행을 잠근다. 정확하지만 기다리는 트랜잭션마다 커넥션을 붙들어 풀 크기가 처리량 상한이 되고 p99가 초 단위로 올라간다.</p></details></div>
+    <div class="opt"><label><input type="radio" name="oversell" value="OPTIMISTIC"> OPTIMISTIC</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">Write only if the version is still the one you read, otherwise read again. Exact and faster than either lock because nothing waits, but under this contention it retries tens of thousands of times.</p>
+        <p lang="ko">읽었을 때의 버전이 그대로일 때만 쓰고, 아니면 다시 읽는다. 아무도 기다리지 않아 정확하면서 락보다 빠르지만, 이 정도 경합에서는 재시도가 수만 번이다.</p></details></div>
+  </fieldset>
+
+  <fieldset><legend>doubleBooking <small><span lang="en">one seat to two users</span><span lang="ko">한 좌석을 두 사람에게</span></small></legend>
+    <div class="opt"><label><input type="radio" name="doubleBooking" value="NONE" checked> NONE</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">The app checks whether the seat is taken, then inserts. Between the check and the insert another request takes the same seat. Even with an exact counter, seats overlap and the run fails.</p>
+        <p lang="ko">앱이 좌석이 찼는지 조회하고 나서 삽입한다. 조회와 삽입 사이에 다른 요청이 같은 좌석을 잡는다. 카운터가 정확해도 좌석이 겹쳐 실행은 FAIL이다.</p></details></div>
+    <div class="opt"><label><input type="radio" name="doubleBooking" value="UNIQUE_CONSTRAINT"> UNIQUE_CONSTRAINT</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">A unique index on (event_id, seat_no) rejects the second insert, whatever the code above it did. The rejections show up as duplicate key errors; that count is the cost of the last line of defense.</p>
+        <p lang="ko">(event_id, seat_no) 유니크 인덱스가 위의 코드가 무엇을 했든 두 번째 삽입을 거절한다. 거절은 중복 키 오류로 나타나고, 그 수가 마지막 방어선의 비용이다.</p></details></div>
+  </fieldset>
+
+  <fieldset><legend>cacheConsistency <small><span lang="en">what the stock viewer sees after sell-out; no strategy makes it zero</span><span lang="ko">매진 뒤 조회자가 보는 잔여석. 어떤 전략도 0으로 만들지 못한다</span></small></legend>
+    <div class="opt"><label><input type="radio" name="cacheConsistency" value="NONE" checked> NONE</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">Cache-aside with a 60 s TTL. The first viewer fills the cache and everyone sees that value until it expires. The run is shorter than the TTL, so the stale count stays to the end.</p>
+        <p lang="ko">TTL 60초의 cache-aside. 첫 조회가 캐시를 채우면 만료될 때까지 모두 그 값을 본다. 실행이 TTL보다 짧아 옛값이 끝까지 남는다.</p></details></div>
+    <div class="opt"><label><input type="radio" name="cacheConsistency" value="TTL_SHORT"> TTL_SHORT</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">Same, with a 1 s TTL. The stale window shrinks to the TTL but never closes. The TTL that closes it is zero, which is no cache at all, and the DB read count shows what the shorter TTL costs.</p>
+        <p lang="ko">같은 방식에 TTL 1초. stale 창이 TTL 이하로 줄지만 닫히지는 않는다. 창을 닫는 TTL은 0, 즉 캐시를 없앤 것이고, DB 조회 수가 짧은 TTL의 비용을 보여준다.</p></details></div>
+    <div class="opt"><label><input type="radio" name="cacheConsistency" value="INVALIDATE_ON_WRITE"> INVALIDATE_ON_WRITE</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">Delete the key after every sale. A viewer that missed the cache, read the DB and slept can write its old value after the last sale's delete, and nothing deletes it again. Raise raceWindowMs to see it every run.</p>
+        <p lang="ko">판매마다 키를 지운다. 캐시 미스로 DB를 읽고 잠든 조회자가 마지막 판매의 삭제 뒤에 옛값을 쓰면 다시 지워질 기회가 없다. raceWindowMs를 올리면 매 실행 재현된다.</p></details></div>
+    <div class="opt"><label><input type="radio" name="cacheConsistency" value="REDIS_AS_SOT"> REDIS_AS_SOT</label>
+      <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
+        <p lang="en">The counter lives in Redis and DECR decides, so there is no second copy to go stale. What remains is transport delay: a value is already the past by the time you look at it. The oversell strategy is ignored here.</p>
+        <p lang="ko">카운터가 Redis에 있고 DECR이 결정하므로 옛값이 될 두 번째 복사본이 없다. 남는 것은 전송 지연뿐이라 읽은 값은 보는 순간 이미 과거다. 여기서는 oversell 전략이 무시된다.</p></details></div>
+  </fieldset>
+
+  <button><span lang="en">Run</span><span lang="ko">실행</span></button>
 </form>
+
+<div id="legend">
+  <span><i></i> <span lang="en">unsold</span><span lang="ko">미판매</span></span>
+  <span><i class="ok"></i> <span lang="en">sold</span><span lang="ko">판매</span></span>
+  <span><i class="dup"></i> <span lang="en">double booked</span><span lang="ko">중복 배정</span></span>
+  <span><i class="over"></i> <span lang="en">over capacity</span><span lang="ko">정원 초과</span></span>
+</div>
 <div id="stock"></div>
 <div id="grid"></div>
-<div id="verdict">대기 중</div>
-<pre id="out"></pre>
-<div id="note">
-  <b>stale 노출은 어떤 전략에서도 0이 되지 않는다.</b> <code>phantomStockViews</code>는 판정에 들어가지 않는다. 캐시를 두는 순간 값이 두 벌이 되고, 둘을 맞추는 방식은 창의 크기를 정할 뿐 창을 닫지 못한다.
-  <ul>
-    <li><b>NONE</b>: TTL(60초)이 끝날 때까지 옛값. 실행이 그보다 짧으면 끝까지 stale.</li>
-    <li><b>TTL_SHORT</b>: 창이 TTL(1초) 이하로 줄지만 닫히지 않는다. 0으로 만드는 TTL은 캐시를 없앤 것과 같다.</li>
-    <li><b>INVALIDATE_ON_WRITE</b>: 마지막 쓰기의 삭제 뒤에 늦게 온 재적재는 다시 지워지지 않는다. 판매가 조회보다 빨리 끝나면 걸리지 않는다. raceWindowMs를 올려 보라.</li>
-    <li><b>REDIS_AS_SOT</b>: 두 번째 복사본이 없어 0에 가깝다. 그래도 읽은 값은 보는 순간 이미 과거다. 이때 oversell 전략은 무시된다.</li>
-  </ul>
-</div>
-<script>
-const f = document.getElementById('f'), grid = document.getElementById('grid'),
-      verdict = document.getElementById('verdict'), out = document.getElementById('out'), stock = document.getElementById('stock');
-const sel = f.querySelector('[name=appInstances]');
+<div id="verdict">idle</div><button id="copy" type="button"></button>
+<div id="reason"></div>
+<table id="cmp"></table>
 
-// LOCAL_LOCK + 앱 2대: 로컬 락이 무너지는 조합을 강조
+<script type="module">
+import { toQuery, fromQuery, flat, compareRows, changedParams, verdictReason, label, T, PARAMS } from './lib.js';
+const $ = id => document.getElementById(id);
+const f = $('f'), grid = $('grid'), verdict = $('verdict'), stock = $('stock'), reason = $('reason'), cmp = $('cmp'), copy = $('copy');
+const btn = f.querySelector('button:not([type])'), sel = f.querySelector('[name=appInstances]');
+let lang = 'en', prev = null, cur = null, live = null; // prev/cur: 비교용 리포트. live: 언어를 바꿀 때 잔여석 줄을 다시 그리기 위한 진행 값.
+
+function setLang(l) {
+  lang = l;
+  document.documentElement.lang = l;
+  try { localStorage.lang = l; } catch {}
+  $('lang').textContent = l === 'en' ? '한국어' : 'EN';
+  render();
+}
+$('lang').onclick = () => setLang(lang === 'en' ? 'ko' : 'en');
+$('random').onclick = () => { f.seed.value = ''; };
+
+// LOCAL_LOCK + 앱 2대: 로컬 락이 무너지는 조합을 강조. REDIS_AS_SOT: Redis가 카운터라 DB 오버셀 전략은 무의미하다.
 f.onchange = () => {
-  sel.classList.toggle('hot', f.oversell.value === 'LOCAL_LOCK' && sel.value === '2');
-  // REDIS_AS_SOT: Redis가 카운터라 DB 오버셀 전략은 무의미하다
+  const hot = f.oversell.value === 'LOCAL_LOCK' && sel.value === '2';
+  sel.classList.toggle('hot', hot);
+  $('hot').classList.toggle('on', hot);
   const sot = f.cacheConsistency.value === 'REDIS_AS_SOT';
   f.querySelectorAll('[name=oversell]').forEach(r => r.disabled = sot);
 };
 
-// 조회자가 마지막으로 본 잔여석과 실제 값(N − ok). 매진 뒤에도 왼쪽이 남아 있으면 그것이 stale read다.
-function showStock(n, ok, lastView) {
-  stock.textContent = `조회자가 보는 잔여석: ${lastView < 0 ? '-' : lastView} / 실제: ${n - ok}`;
+// 시드는 브라우저가 만든다. 서버 Long은 JS 숫자 정밀도를 넘어 링크가 깨진다.
+function specFromForm() {
+  if (!f.seed.value) f.seed.value = Math.floor(Math.random() * 2 ** 31);
+  const d = Object.fromEntries(new FormData(f));
+  return { seatCount: +d.seatCount, userCount: +d.userCount, appInstances: +d.appInstances, raceWindowMs: +d.raceWindowMs, seed: +d.seed,
+           strategies: { oversell: d.oversell ?? 'NONE', doubleBooking: d.doubleBooking, cacheConsistency: d.cacheConsistency } };
+}
+function fillForm(spec) {
+  for (const [k, v] of Object.entries(flat(spec))) f[k].value = v;
+  f.onchange();
 }
 
 // 칸 i = 좌석 i+1. seats[i]가 0이면 회색, 1이면 초록, 2 이상이면 빨강(중복 배정). N을 넘는 판매분은 주황 칸으로 뒤에 붙인다.
@@ -79,28 +162,72 @@ function draw(n, ok, seats) {
   grid.innerHTML = Array.from({ length: n + over }, (_, i) =>
     `<i class="${i >= n ? 'over' : (seats[i] ?? 0) >= 2 ? 'dup' : seats[i] === 1 ? 'ok' : ''}"></i>`).join('');
 }
+// 조회자가 마지막으로 본 잔여석과 실제 값(N − ok). 매진 뒤에도 왼쪽이 남아 있으면 그것이 stale read다.
+function showStock({ n, ok, lastView }) {
+  stock.innerHTML = T[lang].viewer(lastView < 0 ? '-' : lastView, n - ok) +
+    (ok >= n && lastView > 0 ? ` <span id="stale">${T[lang].stale}</span>` : '');
+}
+
+// 행 = 파라미터 8개 + 지표 16개, 열 = 직전 / 이번 / 차이. 직전이 없으면 이번 열만.
+function table() {
+  const t = T[lang], changed = changedParams(prev, cur), fp = prev && flat(prev.spec), fc = flat(cur.spec);
+  const fmt = v => v == null ? '' : Number.isFinite(v) && !Number.isInteger(v) ? v.toFixed(0) : v;
+  const cells = (p, c, d) => (prev ? `<td>${fmt(p)}</td>` : '') + `<td>${fmt(c)}</td>` + (prev ? `<td>${d}</td>` : '');
+  const params = PARAMS.map(k => `<tr class="${changed.includes(k) ? 'changed' : ''}"><td>${k}</td>${cells(fp?.[k], fc[k], '')}</tr>`);
+  const metrics = compareRows(prev, cur).map(r => {
+    const sign = v => (v > 0 ? '+' : '') + fmt(v);
+    const d = r.diff == null ? '' : sign(r.diff) + (r.pct == null ? '' : ` (${sign(Math.round(r.pct * 100))}%)`);
+    return `<tr><td>${label(r.key, lang)}</td>${cells(r.prev, r.cur, d)}</tr>`;
+  });
+  return `<tr><th></th>${prev ? `<th>${t.prev}</th>` : ''}<th>${t.cur}</th>${prev ? `<th>${t.diff}</th>` : ''}</tr>` + params.join('') + metrics.join('');
+}
+
+// 언어에 따라 달라지는 동적 텍스트를 전부 다시 그린다. 정적 텍스트는 CSS가 lang 속성으로 바꾼다.
+function render() {
+  copy.textContent = T[lang].copy;
+  if (live) showStock(live);
+  reason.textContent = cur ? verdictReason(cur, lang) : reason.textContent;
+  cmp.innerHTML = cur ? table() : '';
+}
 
 f.onsubmit = async e => {
   e.preventDefault();
-  f.querySelector('button').disabled = true;
-  const d = Object.fromEntries(new FormData(f));
-  const body = { seatCount: +d.seatCount, userCount: +d.userCount, appInstances: +d.appInstances,
-                 raceWindowMs: +d.raceWindowMs, strategies: { oversell: d.oversell ?? 'NONE', doubleBooking: d.doubleBooking, cacheConsistency: d.cacheConsistency } };
-  draw(body.seatCount, 0, []);
-  showStock(body.seatCount, 0, -1);
-  verdict.className = ''; verdict.textContent = 'RUNNING'; out.textContent = '';
-  const res = await fetch('/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  btn.disabled = true;
+  const spec = specFromForm();
+  live = { n: spec.seatCount, ok: 0, lastView: -1 };
+  draw(spec.seatCount, 0, []);
+  showStock(live);
+  verdict.className = ''; verdict.textContent = 'RUNNING'; reason.textContent = ''; copy.style.display = 'none';
+  const res = await fetch('/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(spec) });
   const { runId, error } = await res.json();
-  if (error) { out.textContent = error; f.querySelector('button').disabled = false; return; }
+  if (error) { verdict.textContent = 'ERROR'; reason.textContent = error; btn.disabled = false; return; }
   const timer = setInterval(async () => {
     const s = await (await fetch('/api/runs/' + runId)).json();
-    draw(body.seatCount, s.progress.ok, s.progress.seats);
-    showStock(body.seatCount, s.progress.ok, s.progress.lastView);
+    live = { n: spec.seatCount, ok: s.progress.ok, lastView: s.progress.lastView };
+    draw(spec.seatCount, s.progress.ok, s.progress.seats);
+    showStock(live);
     if (s.status === 'RUNNING') return;
     clearInterval(timer);
-    f.querySelector('button').disabled = false;
+    btn.disabled = false;
     verdict.className = s.report?.verdict ?? ''; verdict.textContent = s.report?.verdict ?? s.status;
-    out.textContent = JSON.stringify(s.report ?? s, null, 2);
+    if (!s.report) { reason.textContent = s.error ?? ''; return; }
+    prev = cur; cur = s.report;
+    history.replaceState(null, '', toQuery(cur.spec)); // 주소창이 곧 공유 링크
+    copy.style.display = 'inline';
+    for (const [k, v] of Object.entries(cur.spec.strategies)) // 이번에 고른 전략의 해설만 펼친다
+      f.querySelector(`[name=${k}][value=${v}]`).closest('.opt').querySelector('details').open = true;
+    render();
   }, 200);
 };
+copy.onclick = async () => {
+  await navigator.clipboard.writeText(location.href);
+  copy.textContent = T[lang].copied;
+  setTimeout(render, 1500);
+};
+
+let saved = null;
+try { saved = localStorage.lang; } catch {}
+setLang(saved === 'ko' ? 'ko' : 'en');
+const linked = fromQuery(location.search); // 링크로 열었으면 폼을 채우고 바로 실행
+if (linked) { fillForm(linked); f.requestSubmit(); }
 </script>

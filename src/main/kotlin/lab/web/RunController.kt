@@ -20,7 +20,7 @@ data class RunState(val status: String, val progress: Progress, val report: RunR
 @RestController
 @Profile("web")
 class RunController(private val runner: LoadRunner) {
-    private val runs = ConcurrentHashMap<String, RunState>() // ponytail: 메모리 보관, 영속화는 공유 링크(M4)에서
+    private val runs = ConcurrentHashMap<String, RunState>() // 메모리 보관. 공유 링크는 결과가 아니라 파라미터를 담으므로 영속화하지 않는다.
     private val running = AtomicBoolean(false)
 
     @PostMapping("/api/runs")
