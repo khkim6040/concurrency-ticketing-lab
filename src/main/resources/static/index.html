@@ -148,8 +148,9 @@ f.onchange = () => {
 function specFromForm() {
   if (!f.seed.value) f.seed.value = Math.floor(Math.random() * 2 ** 31);
   const d = Object.fromEntries(new FormData(f));
+  // REDIS_AS_SOT일 때 oversell 라디오는 disabled라 FormData에 안 잡힌다. 그래도 체크된 값은 남아 있으니 RadioNodeList에서 읽는다.
   return { seatCount: +d.seatCount, userCount: +d.userCount, appInstances: +d.appInstances, raceWindowMs: +d.raceWindowMs, seed: +d.seed,
-           strategies: { oversell: d.oversell ?? 'NONE', doubleBooking: d.doubleBooking, cacheConsistency: d.cacheConsistency } };
+           strategies: { oversell: d.oversell ?? f.oversell.value, doubleBooking: d.doubleBooking, cacheConsistency: d.cacheConsistency } };
 }
 function fillForm(spec) {
   for (const [k, v] of Object.entries(flat(spec))) f[k].value = v;
