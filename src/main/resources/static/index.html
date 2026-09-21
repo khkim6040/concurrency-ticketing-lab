@@ -123,7 +123,7 @@ import { toQuery, fromQuery, flat, compareRows, changedParams, verdictReason, la
 const $ = id => document.getElementById(id);
 const f = $('f'), grid = $('grid'), verdict = $('verdict'), stock = $('stock'), reason = $('reason'), cmp = $('cmp'), copy = $('copy');
 const btn = f.querySelector('button:not([type])'), sel = f.querySelector('[name=appInstances]');
-let lang = 'en', prev = null, cur = null, live = null; // prev/cur: 비교용 리포트. live: 언어를 바꿀 때 잔여석 줄을 다시 그리기 위한 진행 값.
+let lang = 'en', prev = null, cur = null, live = null, shown = null; // prev/cur: 비교용 리포트. live: 언어를 바꿀 때 잔여석 줄을 다시 그리기 위한 진행 값. shown: 판정 이유 줄이 가리키는 리포트. 실행 중·오류 뒤에는 null.
 
 function setLang(l) {
   lang = l;
@@ -186,7 +186,7 @@ function table() {
 function render() {
   copy.textContent = T[lang].copy;
   if (live) showStock(live);
-  reason.textContent = cur ? verdictReason(cur, lang) : reason.textContent;
+  reason.textContent = shown ? verdictReason(shown, lang) : reason.textContent;
   cmp.innerHTML = cur ? table() : '';
 }
 
@@ -197,7 +197,7 @@ f.onsubmit = async e => {
   live = { n: spec.seatCount, ok: 0, lastView: -1 };
   draw(spec.seatCount, 0, []);
   showStock(live);
-  verdict.className = ''; verdict.textContent = 'RUNNING'; reason.textContent = ''; copy.style.display = 'none';
+  verdict.className = ''; verdict.textContent = 'RUNNING'; reason.textContent = ''; shown = null; copy.style.display = 'none';
   const res = await fetch('/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(spec) });
   const { runId, error } = await res.json();
   if (error) { verdict.textContent = 'ERROR'; reason.textContent = error; btn.disabled = false; return; }
@@ -211,7 +211,7 @@ f.onsubmit = async e => {
     btn.disabled = false;
     verdict.className = s.report?.verdict ?? ''; verdict.textContent = s.report?.verdict ?? s.status;
     if (!s.report) { reason.textContent = s.error ?? ''; return; }
-    prev = cur; cur = s.report;
+    prev = cur; cur = s.report; shown = cur;
     history.replaceState(null, '', toQuery(cur.spec)); // 주소창이 곧 공유 링크
     copy.style.display = 'inline';
     for (const [k, v] of Object.entries(cur.spec.strategies)) // 이번에 고른 전략의 해설만 펼친다
