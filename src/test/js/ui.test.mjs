@@ -70,4 +70,5 @@ test('label keeps the metric key next to the translated name', () => {
 test('T has the same keys in both languages', () => {
   assert.deepEqual(Object.keys(T.ko).sort(), Object.keys(T.en).sort());
   assert.deepEqual(Object.keys(T.ko.metric).sort(), Object.keys(T.en.metric).sort());
+  assert.deepEqual(Object.keys(T.ko.reason).sort(), Object.keys(T.en.reason).sort());
 });

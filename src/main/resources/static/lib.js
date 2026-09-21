@@ -47,7 +47,7 @@ export const changedParams = (prev, cur) =>
 
 export const T = {
   en: {
-    run: 'Run', copy: 'Copy link', copied: 'Copied', prev: 'previous', cur: 'current', diff: 'diff',
+    copy: 'Copy link', copied: 'Copied', prev: 'previous', cur: 'current', diff: 'diff',
     viewer: (v, a) => `viewer sees ${v} / actual ${a}`, stale: '← stale read',
     reason: {
       PASS: () => 'PASS: all three consistency metrics are 0',
@@ -63,7 +63,7 @@ export const T = {
     },
   },
   ko: {
-    run: '실행', copy: '링크 복사', copied: '복사됨', prev: '직전', cur: '이번', diff: '차이',
+    copy: '링크 복사', copied: '복사됨', prev: '직전', cur: '이번', diff: '차이',
     viewer: (v, a) => `조회자가 보는 잔여석 ${v} / 실제 ${a}`, stale: '← stale read',
     reason: {
       PASS: () => 'PASS: 정합성 지표 세 개가 모두 0',
