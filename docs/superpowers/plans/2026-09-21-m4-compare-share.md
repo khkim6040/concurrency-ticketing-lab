@@ -17,7 +17,7 @@
 - 시드는 UI가 `Math.floor(Math.random() * 2 ** 31)`로 만들어 항상 보낸다. 입력란은 실행 뒤에도 값을 유지한다. 재실행 버튼은 없다.
 - 번역하지 않는 것: 전략 이름, 파라미터 필드명, 지표 키, `PASS`/`DEGRADED`/`FAIL`/`RUNNING`/`idle`, 페이지 제목, 서버 오류 메시지. 지표 이름은 번역 뒤에 키를 괄호로 붙인다.
 - 기본 언어 `en`. 선택은 `localStorage.lang`. `localStorage` 접근은 try/catch.
-- `<details>`는 기본 접힘. 실행이 끝나면 고른 전략 3개만 `open`.
+- `<details>`는 기본 접힘. 실행이 끝나면 고른 전략 3개를 `open`으로 바꾸고, 이미 열린 것은 건드리지 않는다(스펙 그대로. 직전 실행의 해설이 비교 표 옆에 남는 것이 의도).
 - 코드 주석은 한국어. 커밋은 `type: English description` 한 줄. 본문·Co-Authored-By 없음.
 
 ## File Structure
