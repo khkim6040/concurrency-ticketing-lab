@@ -42,8 +42,8 @@ tr.changed td{font-weight:bold;background:#fff3e0}
   <label>userCount <input name="userCount" type="number" value="1000" min="1" max="10000">
     <small><span lang="en">concurrent users M</span><span lang="ko">동시 사용자 M</span></small></label>
   <label>appInstances <select name="appInstances"><option>1</option><option selected>2</option></select>
-    <span id="hot"><span lang="en">a JVM lock is per instance; two instances race each other</span><span lang="ko">JVM 락은 인스턴스마다 따로라 2대에서는 서로 경쟁한다</span></span>
     <small><span lang="en">app servers</span><span lang="ko">앱 서버 대수</span></small></label>
+  <span id="hot"><span lang="en">a JVM lock is per instance; two instances race each other</span><span lang="ko">JVM 락은 인스턴스마다 따로라 2대에서는 서로 경쟁한다</span></span>
   <label>raceWindowMs <input name="raceWindowMs" type="number" value="20" min="0" max="200">
     <small><span lang="en">delay injected between read and write</span><span lang="ko">읽기와 쓰기 사이에 넣는 지연</span></small></label>
   <label>seed <input name="seed" type="number" step="1" placeholder="random">
