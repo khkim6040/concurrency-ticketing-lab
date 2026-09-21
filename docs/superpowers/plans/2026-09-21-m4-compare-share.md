@@ -50,7 +50,7 @@
   - `changedParams(prev: report | null, cur: report) → string[]` — `PARAMS` 중 `spec`이 달라진 키
   - `verdictReason(report, lang) → string`
   - `label(key, lang) → string` — 지표 이름. `verdict`는 키 없이, 나머지는 `"이름 (key)"`
-  - `T: { en: {...}, ko: {...} }` — `run`, `idle`, `copy`, `copied`, `prev`, `cur`, `diff`, `viewer(v, a)`, `stale`, `reason.{PASS,DEGRADED,FAIL}`, `metric.{key}`
+  - `T: { en: {...}, ko: {...} }` — `run`, `copy`, `copied`, `prev`, `cur`, `diff`, `viewer(v, a)`, `stale`, `reason.{PASS,DEGRADED,FAIL}`, `metric.{key}`
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
