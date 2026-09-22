@@ -66,13 +66,13 @@ export const T = {
     copy: '링크 복사', copied: '복사됨', prev: '직전', cur: '이번', diff: '차이',
     viewer: (v, a) => `조회자가 보는 잔여석 ${v} / 실제 ${a}`, stale: '← stale read',
     reason: {
-      PASS: () => 'PASS: 정합성 지표 세 개가 모두 0',
+      PASS: () => 'PASS: 정합성 지표 세 개가 모두 0입니다',
       DEGRADED: r => `DEGRADED: 같은 조건 NONE 처리량의 ${Math.round(r * 100)}%`,
-      FAIL: ks => `FAIL: ${ks.join(', ')}이(가) 0이 아님`,
+      FAIL: ks => `FAIL: 0이 아닌 지표 ${ks.join(', ')}`,
     },
     metric: {
       verdict: '판정', oversoldCount: '정원 초과 판매', ledgerMismatch: '원장 불일치', doubleBookedSeats: '중복 배정 좌석',
-      phantomStockViews: '매진 후 잔여석 노출', staleWindowMs: 'stale 창 (ms)',
+      phantomStockViews: '매진 후 잔여석 노출', staleWindowMs: 'stale 구간 (ms)',
       throughput: '처리량 (req/s)', p50Ms: 'p50 (ms)', p95Ms: 'p95 (ms)', p99Ms: 'p99 (ms)', errorCount: '오류',
       retryCount: '재시도', dbConnectionPeak: 'DB 커넥션 최대', duplicateKeyCount: '중복 키 거절',
       viewCount: '잔여석 조회', viewDbReads: 'DB까지 간 조회',

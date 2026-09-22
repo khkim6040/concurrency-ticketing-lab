@@ -43,64 +43,64 @@ tr.changed td{font-weight:bold;background:#fff3e0}
     <small><span lang="en">concurrent users M</span><span lang="ko">동시 사용자 M</span></small></label>
   <label>appInstances <select name="appInstances"><option>1</option><option selected>2</option></select>
     <small><span lang="en">app servers</span><span lang="ko">앱 서버 대수</span></small></label>
-  <span id="hot"><span lang="en">a JVM lock is per instance; two instances race each other</span><span lang="ko">JVM 락은 인스턴스마다 따로라 2대에서는 서로 경쟁한다</span></span>
+  <span id="hot"><span lang="en">a JVM lock is per instance; two instances race each other</span><span lang="ko">JVM 락은 인스턴스마다 따로라 2대에서는 서로 경쟁합니다</span></span>
   <label>raceWindowMs <input name="raceWindowMs" type="number" value="20" min="0" max="200">
     <small><span lang="en">delay injected between read and write</span><span lang="ko">읽기와 쓰기 사이에 넣는 지연</span></small></label>
   <label>seed <input name="seed" type="number" step="1" placeholder="random">
     <button type="button" id="random"><span lang="en">Random</span><span lang="ko">랜덤</span></button>
-    <small><span lang="en">same seed = same seat picks; kept after a run, so Run again replays it</span><span lang="ko">같은 시드 = 같은 좌석 선택. 실행 뒤에도 남으므로 다시 실행하면 같은 시드로 돈다</span></small></label>
+    <small><span lang="en">same seed = same seat picks; kept after a run, so Run again replays it</span><span lang="ko">같은 시드 = 같은 좌석 선택. 실행 뒤에도 남으므로 다시 실행하면 같은 시드로 실행됩니다</span></small></label>
 
   <fieldset><legend>oversell <small><span lang="en">sells more tickets than seats</span><span lang="ko">좌석보다 표를 더 파는 문제</span></small></legend>
     <div class="opt"><label><input type="radio" name="oversell" value="NONE" checked> NONE</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">Read the count, sleep, write count minus one. Another request reads the same value in between and both write the same result, so one sale is lost from the ledger. This is a lost update.</p>
-        <p lang="ko">잔여석을 읽고, 잠들고, 하나 뺀 값을 쓴다. 그 사이 다른 요청이 같은 값을 읽어 둘 다 같은 결과를 쓰므로 판매 하나가 원장에서 사라진다. lost update다.</p></details></div>
+        <p lang="ko">잔여석을 읽고, 잠들고, 하나 뺀 값을 씁니다. 그 사이 다른 요청이 같은 값을 읽어 둘 다 같은 결과를 쓰므로 판매 하나가 원장에서 사라집니다. 전형적인 lost update입니다.</p></details></div>
     <div class="opt"><label><input type="radio" name="oversell" value="LOCAL_LOCK"> LOCAL_LOCK</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">A ReentrantLock in the JVM serializes requests, so one instance balances the counter exactly. Two instances each serialize only their own half and the halves race each other, so it oversells almost as badly as NONE while paying the lock's latency.</p>
-        <p lang="ko">JVM 안의 ReentrantLock이 요청을 직렬화하므로 앱 1대면 카운터가 정확히 맞는다. 2대면 각자 자기 절반만 직렬화하고 두 절반이 서로 경쟁해, 락의 지연은 치르면서 NONE만큼 오버셀한다.</p></details></div>
+        <p lang="ko">JVM 안의 ReentrantLock이 요청을 직렬화하므로 앱 1대면 카운터가 정확히 맞습니다. 2대면 각자 자기 절반만 직렬화하고 두 절반이 서로 경쟁해, 락 때문에 느려지기만 하고 오버셀은 NONE만큼 납니다.</p></details></div>
     <div class="opt"><label><input type="radio" name="oversell" value="CONDITIONAL_UPDATE"> CONDITIONAL_UPDATE</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0. The database checks and decrements in one statement, so there is no window to sleep in. Exact without a lock, and the fastest of the consistent strategies.</p>
-        <p lang="ko">UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0. DB가 한 문장 안에서 검사하고 차감하므로 잠들 틈이 없다. 락 없이 정확하고, 정합한 전략 중 가장 빠르다.</p></details></div>
+        <p lang="ko">UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0. DB가 한 문장 안에서 검사하고 차감하므로 잠들 틈이 없습니다. 락 없이도 정확하고, 정합한 전략 중 가장 빠릅니다.</p></details></div>
     <div class="opt"><label><input type="radio" name="oversell" value="PESSIMISTIC"> PESSIMISTIC</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">SELECT ... FOR UPDATE locks the row for the whole transaction, sleep included. Exact, but every waiting transaction holds a connection, so the pool size becomes the throughput ceiling and p99 climbs to seconds.</p>
-        <p lang="ko">SELECT ... FOR UPDATE가 트랜잭션 내내, 잠드는 동안에도 행을 잠근다. 정확하지만 기다리는 트랜잭션마다 커넥션을 붙들어 풀 크기가 처리량 상한이 되고 p99가 초 단위로 올라간다.</p></details></div>
+        <p lang="ko">SELECT ... FOR UPDATE가 트랜잭션 내내, 잠드는 동안에도 행을 잠급니다. 정확하지만 기다리는 트랜잭션마다 커넥션을 붙들어, 풀 크기가 곧 처리량 상한이 되고 p99가 초 단위로 올라갑니다.</p></details></div>
     <div class="opt"><label><input type="radio" name="oversell" value="OPTIMISTIC"> OPTIMISTIC</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">Write only if the version is still the one you read, otherwise read again. Exact and faster than either lock because nothing waits, but under this contention it retries tens of thousands of times.</p>
-        <p lang="ko">읽었을 때의 버전이 그대로일 때만 쓰고, 아니면 다시 읽는다. 아무도 기다리지 않아 정확하면서 락보다 빠르지만, 이 정도 경합에서는 재시도가 수만 번이다.</p></details></div>
+        <p lang="ko">읽었을 때의 버전이 그대로일 때만 쓰고, 아니면 다시 읽습니다. 아무도 기다리지 않아 정확하면서 락보다 빠르지만, 이 정도 경합에서는 재시도가 수만 번입니다.</p></details></div>
   </fieldset>
 
   <fieldset><legend>doubleBooking <small><span lang="en">one seat to two users</span><span lang="ko">한 좌석을 두 사람에게</span></small></legend>
     <div class="opt"><label><input type="radio" name="doubleBooking" value="NONE" checked> NONE</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">The app checks whether the seat is taken, then inserts. Between the check and the insert another request takes the same seat. Even with an exact counter, seats overlap and the run fails.</p>
-        <p lang="ko">앱이 좌석이 찼는지 조회하고 나서 삽입한다. 조회와 삽입 사이에 다른 요청이 같은 좌석을 잡는다. 카운터가 정확해도 좌석이 겹쳐 실행은 FAIL이다.</p></details></div>
+        <p lang="ko">앱이 좌석이 찼는지 조회한 뒤에 삽입합니다. 조회와 삽입 사이에 다른 요청이 같은 좌석을 잡습니다. 카운터가 정확해도 좌석이 겹치면 실행은 FAIL입니다.</p></details></div>
     <div class="opt"><label><input type="radio" name="doubleBooking" value="UNIQUE_CONSTRAINT"> UNIQUE_CONSTRAINT</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">A unique index on (event_id, seat_no) rejects the second insert, whatever the code above it did. The rejections show up as duplicate key errors; that count is the cost of the last line of defense.</p>
-        <p lang="ko">(event_id, seat_no) 유니크 인덱스가 위의 코드가 무엇을 했든 두 번째 삽입을 거절한다. 거절은 중복 키 오류로 나타나고, 그 수가 마지막 방어선의 비용이다.</p></details></div>
+        <p lang="ko">(event_id, seat_no) 유니크 인덱스는 윗단 코드가 무엇을 했든 두 번째 삽입을 거절합니다. 거절은 중복 키 오류로 나타나고, 그 수가 마지막 방어선의 비용입니다.</p></details></div>
   </fieldset>
 
-  <fieldset><legend>cacheConsistency <small><span lang="en">what the stock viewer sees after sell-out; no strategy makes it zero</span><span lang="ko">매진 뒤 조회자가 보는 잔여석. 어떤 전략도 0으로 만들지 못한다</span></small></legend>
+  <fieldset><legend>cacheConsistency <small><span lang="en">what the stock viewer sees after sell-out; no strategy makes it zero</span><span lang="ko">매진 뒤 조회자가 보는 잔여석. 어떤 전략도 0으로 만들지 못합니다</span></small></legend>
     <div class="opt"><label><input type="radio" name="cacheConsistency" value="NONE" checked> NONE</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">Cache-aside with a 60 s TTL. The first viewer fills the cache and everyone sees that value until it expires. The run is shorter than the TTL, so the stale count stays to the end.</p>
-        <p lang="ko">TTL 60초의 cache-aside. 첫 조회가 캐시를 채우면 만료될 때까지 모두 그 값을 본다. 실행이 TTL보다 짧아 옛값이 끝까지 남는다.</p></details></div>
+        <p lang="ko">TTL 60초의 cache-aside. 첫 조회가 캐시를 채우면 만료될 때까지 모두 그 값을 봅니다. 실행이 TTL보다 짧아 옛값이 끝까지 남습니다.</p></details></div>
     <div class="opt"><label><input type="radio" name="cacheConsistency" value="TTL_SHORT"> TTL_SHORT</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">Same, with a 1 s TTL. The stale window shrinks to the TTL but never closes. The TTL that closes it is zero, which is no cache at all, and the DB read count shows what the shorter TTL costs.</p>
-        <p lang="ko">같은 방식에 TTL 1초. stale 창이 TTL 이하로 줄지만 닫히지는 않는다. 창을 닫는 TTL은 0, 즉 캐시를 없앤 것이고, DB 조회 수가 짧은 TTL의 비용을 보여준다.</p></details></div>
+        <p lang="ko">같은 방식에 TTL 1초. stale 구간이 TTL 이하로 줄지만 닫히지는 않습니다. 구간을 닫는 TTL은 0, 즉 캐시를 없앤 것이고, DB 조회 수가 짧은 TTL의 비용을 보여줍니다.</p></details></div>
     <div class="opt"><label><input type="radio" name="cacheConsistency" value="INVALIDATE_ON_WRITE"> INVALIDATE_ON_WRITE</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">Delete the key after every sale. A viewer that missed the cache, read the DB and slept can write its old value after the last sale's delete, and nothing deletes it again. Raise raceWindowMs to see it every run.</p>
-        <p lang="ko">판매마다 키를 지운다. 캐시 미스로 DB를 읽고 잠든 조회자가 마지막 판매의 삭제 뒤에 옛값을 쓰면 다시 지워질 기회가 없다. raceWindowMs를 올리면 매 실행 재현된다.</p></details></div>
+        <p lang="ko">판매마다 키를 지웁니다. 캐시 미스로 DB를 읽고 잠든 조회자가 마지막 판매의 삭제 뒤에 옛값을 쓰면, 그 값을 다시 지울 기회가 없습니다. raceWindowMs를 올리면 매 실행 재현됩니다.</p></details></div>
     <div class="opt"><label><input type="radio" name="cacheConsistency" value="REDIS_AS_SOT"> REDIS_AS_SOT</label>
       <details><summary><span lang="en">why?</span><span lang="ko">왜?</span></summary>
         <p lang="en">The counter lives in Redis and DECR decides, so there is no second copy to go stale. What remains is transport delay: a value is already the past by the time you look at it. The oversell strategy is ignored here.</p>
-        <p lang="ko">카운터가 Redis에 있고 DECR이 결정하므로 옛값이 될 두 번째 복사본이 없다. 남는 것은 전송 지연뿐이라 읽은 값은 보는 순간 이미 과거다. 여기서는 oversell 전략이 무시된다.</p></details></div>
+        <p lang="ko">카운터가 Redis에 있고 DECR이 결정하므로 옛값이 될 사본 자체가 없습니다. 남는 것은 전송 지연뿐이라 읽은 값은 보는 순간 이미 과거입니다. 여기서는 oversell 전략이 무시됩니다.</p></details></div>
   </fieldset>
 
   <button><span lang="en">Run</span><span lang="ko">실행</span></button>

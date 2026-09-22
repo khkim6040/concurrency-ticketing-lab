@@ -58,7 +58,7 @@ test('verdictReason names the non-zero metrics, the baseline ratio, or all clear
   const degraded = report(spec, 'DEGRADED', { performance: { throughput: 380 }, top: { baselineThroughput: 1000 } });
   assert.equal(verdictReason(degraded, 'en'), 'DEGRADED: 38% of the NONE baseline throughput');
   assert.equal(verdictReason(report(spec, 'PASS'), 'en'), 'PASS: all three consistency metrics are 0');
-  assert.equal(verdictReason(report(spec, 'PASS'), 'ko'), 'PASS: 정합성 지표 세 개가 모두 0');
+  assert.equal(verdictReason(report(spec, 'PASS'), 'ko'), 'PASS: 정합성 지표 세 개가 모두 0입니다');
 });
 
 test('label keeps the metric key next to the translated name', () => {
