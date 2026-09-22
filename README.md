@@ -11,11 +11,11 @@ The whole point is one claim: the more consistency you enforce, the less through
 ## What it does
 
 - Two app servers, MySQL and Redis on Docker Compose. With one server a JVM lock solves every problem here, and that is the wrong thing to learn, so two is the minimum.
-- A `raceWindowMs` knob that sleeps between the read and the write, inside the lock or transaction. The race then reproduces on every run, not on a lucky few.
+- A `raceWindowMs` knob that sleeps between the read and the write, inside the lock or transaction, so every run reproduces the race.
 - Three strategy axes, switched per run without a restart:
-  - **oversell** — `NONE`, `LOCAL_LOCK` (a JVM `ReentrantLock`), `CONDITIONAL_UPDATE`, `PESSIMISTIC` (`SELECT ... FOR UPDATE`), `OPTIMISTIC` (version check with unbounded retry)
-  - **doubleBooking** — `NONE` (check the seat, then insert) and `UNIQUE_CONSTRAINT` (a unique index on `(event_id, seat_no)`, created or dropped at the start of every run)
-  - **cacheConsistency** — `NONE` (cache-aside, 60 s TTL), `TTL_SHORT` (1 s), `INVALIDATE_ON_WRITE`, and `REDIS_AS_SOT`, where the counter lives in Redis, `DECR` decides, and the oversell strategy is ignored
+  - `oversell`: `NONE`, `LOCAL_LOCK` (a JVM `ReentrantLock`), `CONDITIONAL_UPDATE`, `PESSIMISTIC` (`SELECT ... FOR UPDATE`), `OPTIMISTIC` (version check with unbounded retry)
+  - `doubleBooking`: `NONE` (check the seat, then insert) and `UNIQUE_CONSTRAINT` (a unique index on `(event_id, seat_no)`, created or dropped at the start of every run)
+  - `cacheConsistency`: `NONE` (cache-aside, 60 s TTL), `TTL_SHORT` (1 s), `INVALIDATE_ON_WRITE`, and `REDIS_AS_SOT`, where the counter lives in Redis, `DECR` decides, and the oversell strategy is ignored
 - Four numbers counted in the database once the run is over: `oversoldCount`, `ledgerMismatch`, `doubleBookedSeats`, `duplicateKeyCount`. Four more measured on the way: throughput, p50/p95/p99, `retryCount`, `dbConnectionPeak`. The verdict is PASS or FAIL, or DEGRADED when a consistent run does at most half the throughput of the matching `NONE` run.
 - Two viewer threads poll the stock cache (`GET /api/stock`) every 10 ms during the run and for two seconds after. Reads that still show seats left after sell-out are `phantomStockViews`, reported with `staleWindowMs` and `viewDbReads`. None of the three affect the verdict: a stale read is a design choice, and the UI says so under the report.
 - A seat grid that fills in while the run is in flight: gray unsold, green sold once, red sold to two or more users, orange for bookings past capacity.
@@ -71,7 +71,7 @@ The three axes and the instance count make 80 combinations, which fold to 38. `R
 Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a baseline at two instances. The one-instance `LOCAL_LOCK` runs have no matching baseline and can only read PASS or FAIL, which is why `LOCAL_LOCK` at one instance passes at a throughput that would mark `PESSIMISTIC` degraded.
 
 <details>
-<summary><b>oversell = NONE</b> — no defense: read the counter, sleep, write it back (6)</summary>
+<summary><b>oversell = NONE</b>. No defense: read the counter, sleep, write it back (6)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE** → FAIL
 
@@ -110,7 +110,7 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 </details>
 
 <details>
-<summary><b>oversell = LOCAL_LOCK</b> — a JVM `ReentrantLock`, at one instance and at two (12)</summary>
+<summary><b>oversell = LOCAL_LOCK</b>. A JVM `ReentrantLock`, at one instance and at two (12)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE · appInstances=1** → FAIL
 
@@ -185,7 +185,7 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 </details>
 
 <details>
-<summary><b>oversell = CONDITIONAL_UPDATE</b> — `UPDATE ... WHERE remaining > 0`, one statement (6)</summary>
+<summary><b>oversell = CONDITIONAL_UPDATE</b>. One statement: `UPDATE ... WHERE remaining > 0` (6)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE** → FAIL
 
@@ -224,7 +224,7 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 </details>
 
 <details>
-<summary><b>oversell = PESSIMISTIC</b> — `SELECT ... FOR UPDATE` inside a transaction (6)</summary>
+<summary><b>oversell = PESSIMISTIC</b>. `SELECT ... FOR UPDATE` inside a transaction (6)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE** → FAIL
 
@@ -263,7 +263,7 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 </details>
 
 <details>
-<summary><b>oversell = OPTIMISTIC</b> — a version check with unbounded retry (6)</summary>
+<summary><b>oversell = OPTIMISTIC</b>. A version check with unbounded retry (6)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE** → FAIL
 
@@ -302,7 +302,7 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 </details>
 
 <details>
-<summary><b>cacheConsistency = REDIS_AS_SOT</b> — the counter lives in Redis and `DECR` decides, so the oversell strategy is ignored (2)</summary>
+<summary><b>cacheConsistency = REDIS_AS_SOT</b>. The counter lives in Redis and `DECR` decides, so the oversell strategy is ignored (2)</summary>
 
 **doubleBooking=NONE** → FAIL
 
@@ -354,7 +354,7 @@ GET /api/runs/{runId}
 
 One Spring Boot module, built into one image, with the role picked by profile. The `app` profile exposes only the reservation endpoint, the `web` profile the run API and the load generator. App instances are stateless: the strategy and the delay come in the request body, so switching strategies never needs a restart.
 
-The load generator spawns M virtual threads and lines them up behind a single `CountDownLatch`. Requests have to originate on the server rather than in the browser, otherwise start-time jitter alone is enough to make the race disappear.
+The load generator spawns M virtual threads and lines them up behind a single `CountDownLatch`. Requests originate on the server. From the browser, start-time jitter alone is enough to make the race disappear.
 
 Database access goes through `JdbcClient` with the SQL written out by hand. JPA is deliberately absent. The lock layer (`FOR UPDATE`, conditional updates, version checks) has to be visible in the code or there is nothing to learn from. Redis holds the stock cache under `stock:{eventId}`; under `REDIS_AS_SOT` it holds the counter itself.
 

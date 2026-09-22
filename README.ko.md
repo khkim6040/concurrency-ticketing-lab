@@ -11,11 +11,11 @@
 ## 무엇을 하는가
 
 - 앱 서버 두 대, MySQL, Redis를 Docker Compose로 띄웁니다. 한 대만 두면 JVM 락 하나로 여기서 다루는 문제가 전부 풀려 버립니다. 그것이야말로 배우면 안 되는 결론이라 최소 두 대입니다.
-- `raceWindowMs` 노브는 읽기와 쓰기 사이, 락이나 트랜잭션 안에서 잠듭니다. 덕분에 경합이 어쩌다 한 번이 아니라 매 실행 재현됩니다.
+- `raceWindowMs` 노브는 읽기와 쓰기 사이, 락이나 트랜잭션 안에서 잠듭니다. 덕분에 매 실행 경합이 재현됩니다.
 - 전략 축 세 개. 재시작 없이 실행마다 바꿉니다.
-  - **oversell** — `NONE`, `LOCAL_LOCK`(JVM `ReentrantLock`), `CONDITIONAL_UPDATE`, `PESSIMISTIC`(`SELECT ... FOR UPDATE`), `OPTIMISTIC`(버전 확인, 재시도 상한 없음)
-  - **doubleBooking** — `NONE`(좌석을 조회한 뒤 INSERT)과 `UNIQUE_CONSTRAINT`(`(event_id, seat_no)` 유니크 인덱스. 매 실행 시작에 만들거나 지웁니다)
-  - **cacheConsistency** — `NONE`(cache-aside, TTL 60초), `TTL_SHORT`(1초), `INVALIDATE_ON_WRITE`, 그리고 카운터가 Redis에 있고 `DECR`이 결정하며 oversell 전략이 무시되는 `REDIS_AS_SOT`
+  - `oversell`: `NONE`, `LOCAL_LOCK`(JVM `ReentrantLock`), `CONDITIONAL_UPDATE`, `PESSIMISTIC`(`SELECT ... FOR UPDATE`), `OPTIMISTIC`(버전 확인, 재시도 상한 없음)
+  - `doubleBooking`: `NONE`(좌석을 조회한 뒤 INSERT)과 `UNIQUE_CONSTRAINT`(`(event_id, seat_no)` 유니크 인덱스. 매 실행 시작에 만들거나 지웁니다)
+  - `cacheConsistency`: `NONE`(cache-aside, TTL 60초), `TTL_SHORT`(1초), `INVALIDATE_ON_WRITE`, 그리고 카운터가 Redis에 있고 `DECR`이 결정하며 oversell 전략이 무시되는 `REDIS_AS_SOT`
 - 실행이 끝난 뒤 DB에서 세는 값 네 개: `oversoldCount`, `ledgerMismatch`, `doubleBookedSeats`, `duplicateKeyCount`. 실행 중에 재는 값 네 개: 처리량, p50/p95/p99, `retryCount`, `dbConnectionPeak`. 판정은 PASS 아니면 FAIL이고, 정합한 실행이 같은 조건 `NONE`의 절반 이하 처리량이면 DEGRADED입니다.
 - 조회자 스레드 두 개가 실행 중과 종료 후 2초 동안 10ms마다 재고 캐시(`GET /api/stock`)를 폴링합니다. 매진 뒤에도 잔여석이 있다고 답한 조회가 `phantomStockViews`이고, `staleWindowMs`·`viewDbReads`와 함께 보고합니다. 셋 다 판정에는 들어가지 않습니다. stale read는 설계 선택이고, UI에도 보고서 아래에 그렇게 적혀 있습니다.
 - 실행 중에 채워지는 좌석 그리드. 회색은 미판매, 초록은 한 번 판매, 빨강은 두 명 이상에게 판매, 주황은 정원을 넘긴 예약입니다.
@@ -71,7 +71,7 @@ N=100, M=1,000, `raceWindowMs=20`, `doubleBooking=NONE`으로 각각 세 번씩(
 각 묶음은 `oversell=NONE`을 먼저 돌리므로 앱 2대에서는 `DEGRADED` 검사에 기준선이 있습니다. 앱 1대 실행은 맞는 기준선이 없어 PASS 아니면 FAIL만 나옵니다. `LOCAL_LOCK` 1대가, `PESSIMISTIC`이었다면 DEGRADED로 찍혔을 처리량인데도 PASS로 나오는 이유입니다.
 
 <details>
-<summary><b>oversell = NONE</b> — 방어 없음. 카운터를 읽고, 자고, 다시 씁니다 (6)</summary>
+<summary><b>oversell = NONE</b>. 방어 없음. 카운터를 읽고, 자고, 다시 씁니다 (6)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE** → FAIL
 
@@ -110,7 +110,7 @@ N=100, M=1,000, `raceWindowMs=20`, `doubleBooking=NONE`으로 각각 세 번씩(
 </details>
 
 <details>
-<summary><b>oversell = LOCAL_LOCK</b> — JVM `ReentrantLock`. 앱 1대와 2대를 모두 담았습니다 (12)</summary>
+<summary><b>oversell = LOCAL_LOCK</b>. JVM `ReentrantLock`. 앱 1대와 2대를 모두 담았습니다 (12)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE · appInstances=1** → FAIL
 
@@ -185,7 +185,7 @@ N=100, M=1,000, `raceWindowMs=20`, `doubleBooking=NONE`으로 각각 세 번씩(
 </details>
 
 <details>
-<summary><b>oversell = CONDITIONAL_UPDATE</b> — `UPDATE ... WHERE remaining > 0` 한 문장 (6)</summary>
+<summary><b>oversell = CONDITIONAL_UPDATE</b>. `UPDATE ... WHERE remaining > 0` 한 문장 (6)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE** → FAIL
 
@@ -224,7 +224,7 @@ N=100, M=1,000, `raceWindowMs=20`, `doubleBooking=NONE`으로 각각 세 번씩(
 </details>
 
 <details>
-<summary><b>oversell = PESSIMISTIC</b> — 트랜잭션 안의 `SELECT ... FOR UPDATE` (6)</summary>
+<summary><b>oversell = PESSIMISTIC</b>. 트랜잭션 안의 `SELECT ... FOR UPDATE` (6)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE** → FAIL
 
@@ -263,7 +263,7 @@ N=100, M=1,000, `raceWindowMs=20`, `doubleBooking=NONE`으로 각각 세 번씩(
 </details>
 
 <details>
-<summary><b>oversell = OPTIMISTIC</b> — 버전 확인, 재시도 상한 없음 (6)</summary>
+<summary><b>oversell = OPTIMISTIC</b>. 버전 확인, 재시도 상한 없음 (6)</summary>
 
 **doubleBooking=NONE · cacheConsistency=NONE** → FAIL
 
@@ -302,7 +302,7 @@ N=100, M=1,000, `raceWindowMs=20`, `doubleBooking=NONE`으로 각각 세 번씩(
 </details>
 
 <details>
-<summary><b>cacheConsistency = REDIS_AS_SOT</b> — 카운터가 Redis에 있고 `DECR`이 결정하므로 oversell 전략이 무시됩니다 (2)</summary>
+<summary><b>cacheConsistency = REDIS_AS_SOT</b>. 카운터가 Redis에 있고 `DECR`이 결정하므로 oversell 전략이 무시됩니다 (2)</summary>
 
 **doubleBooking=NONE** → FAIL
 
@@ -354,7 +354,7 @@ GET /api/runs/{runId}
 
 Spring Boot 모듈 하나를 이미지 하나로 빌드하고, 역할은 프로파일로 고릅니다. `app` 프로파일은 예매 엔드포인트만 열고, `web` 프로파일은 실행 API와 부하 생성기를 엽니다. 앱 인스턴스는 무상태입니다. 전략과 지연이 요청 본문으로 들어오므로 전략을 바꿀 때 재시작이 필요 없습니다.
 
-부하 생성기는 가상 스레드 M개를 띄워 `CountDownLatch` 하나 뒤에 줄 세웁니다. 요청은 브라우저가 아니라 서버에서 출발해야 합니다. 그러지 않으면 출발 시각이 흔들리는 것만으로 경합이 사라집니다.
+부하 생성기는 가상 스레드 M개를 띄워 `CountDownLatch` 하나 뒤에 줄 세웁니다. 요청은 서버에서 출발해야 합니다. 브라우저에서 출발하면 출발 시각이 흔들리는 것만으로 경합이 사라집니다.
 
 DB 접근은 `JdbcClient`로 하고 SQL은 손으로 씁니다. JPA는 일부러 쓰지 않았습니다. 락을 거는 부분(`FOR UPDATE`, 조건부 업데이트, 버전 확인)이 코드에 보이지 않으면 배울 것이 없습니다. Redis는 `stock:{eventId}`에 재고 캐시를 담고, `REDIS_AS_SOT`에서는 카운터 자체를 담습니다.
 
