@@ -1,5 +1,7 @@
 # concurrency-ticketing-lab
 
+**English** · [한국어](README.ko.md)
+
 A simulator that lets you switch race conditions in a ticket booking system on and off and see the result as numbers. You pick N seats and M concurrent users, choose a defense strategy, and get back both a consistency score and a throughput score.
 
 The whole point is one claim: the more consistency you enforce, the less throughput you get. Both axes are always on screen, because a tool where turning every defense on is the right answer would be teaching the wrong lesson.
