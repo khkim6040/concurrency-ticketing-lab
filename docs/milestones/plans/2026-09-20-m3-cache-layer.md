@@ -651,7 +651,7 @@ Expected:
 - `NONE`: `phantom` 수백, `stale`이 실행 길이 + 2,000ms 근처, `viewDb=1`.
 - `TTL_SHORT`: `phantom` 수십, `stale ≤ 1,100` 근처, `viewDb`가 실행 초 수 + 2 근처.
 - `INVALIDATE_ON_WRITE`: 경합이 걸리면 `phantom` 수백·`stale`이 `NONE`과 비슷, 안 걸리면 0. `viewDb`는 수십.
-- `NONE REDIS_AS_SOT`: `oversell=NONE`인데도 `oversold=0 ledger=0`(Redis가 결정), `phantom` 0~1, `viewDb=0`.
+- `NONE REDIS_AS_SOT`: `oversell=NONE`인데도 `oversold=0 ledger=0`(Redis가 결정), `phantom` 0\~1, `viewDb=0`.
 
 `views=0`이면 web 로그(`docker compose logs web | grep 'stock view failed'`)에서 조회 URL·Redis 연결을 본다. `REDIS_AS_SOT`에서 `oversold>0`이면 키 시드가 실행되는지(`docker compose exec redis redis-cli keys 'stock:*'`)를 본다.
 
@@ -823,9 +823,9 @@ Expected:
 - M1·M2 구간: M2 README 표와 같은 판정 패턴. 조회자 2개가 붙었지만 캐시 `NONE`이라 DB 조회는 실행당 1회이고 수치는 M2 범위 안이어야 한다. `oversold`·`ledger`·`dup` 패턴이 M2와 같은지로 회귀를 본다.
 - M3 구간(`CONDITIONAL_UPDATE` + `UNIQUE_CONSTRAINT`, 모두 `PASS` 또는 `DEGRADED`, `oversold=0 ledger=0 dup=0`):
   - `cache=NONE`: 5/5 `phantom` 수백, `stale`이 실행 길이 + 2,000ms 근처, `viewDb=1`.
-  - `cache=TTL_SHORT`: 5/5 `phantom > 0`, `stale ≤ 1,100ms` 근처, `viewDb`가 한 자리~열 초반.
+  - `cache=TTL_SHORT`: 5/5 `phantom > 0`, `stale ≤ 1,100ms` 근처, `viewDb`가 한 자리\~열 초반.
   - `cache=INVALIDATE_ON_WRITE`: 경합이 걸린 실행은 `phantom` 수백·`stale`이 `NONE`과 비슷, 안 걸린 실행은 0. 재현율(5회 중 몇 회)을 README에 그대로 적는다. `viewDb`는 수십.
-  - `cache=REDIS_AS_SOT`: `phantom` 0~1, `stale` 0~수 ms, `viewDb=0`.
+  - `cache=REDIS_AS_SOT`: `phantom` 0\~1, `stale` 0\~수 ms, `viewDb=0`.
 
 `NONE`에서 `phantom=0`이면 `soldOutAt`이 찍히는지(`ok`가 100에 도달하는지)와 조회자가 실제로 도는지(`viewCount`)를 먼저 본다. `TTL_SHORT`의 `stale`이 1,100ms를 크게 넘으면 `SET ... EX`의 TTL 분기를 의심한다.
 
