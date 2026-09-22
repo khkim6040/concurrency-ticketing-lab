@@ -60,6 +60,196 @@ Five runs each with the same parameters, `CONDITIONAL_UPDATE` + `UNIQUE_CONSTRAI
 
 `NONE` keeps the first value it saw until the TTL expires, which is after the run ends. `TTL_SHORT` bounds the window to the TTL and no lower; the TTL that closes it is zero, which is no cache. `INVALIDATE_ON_WRITE` is right until a reader that missed the cache, read the database and slept lands its stale value after the last write's delete, and then nothing deletes it again: at the default 20 ms window that lands in 2 of 5 runs, at 200 ms in all five. The race is a property of the read latency against the write burst, and the knob only makes it visible. `REDIS_AS_SOT` has no second copy, so the measurement shows zero. The cost side is the DB reads column: the shorter the window, the less the cache absorbs.
 
+### Every combination
+
+Every case below is N=100, M=1,000, `raceWindowMs=20`, `seed=42`, two app instances unless the caption says otherwise, recorded by `./scripts/case-shots.sh`. One screenshot per case: the seat grid, the verdict, and that run's whole metric table. 25 FAIL, 7 PASS, 6 DEGRADED.
+
+The three axes and the instance count make 80 combinations, which fold to 38. `REDIS_AS_SOT` keeps the counter in Redis and ignores the oversell strategy, so its five rows are one. `appInstances` changes the outcome only for `LOCAL_LOCK`, the one defense that lives inside the JVM; the others are in MySQL or Redis and read the same at one instance as at two.
+
+Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a baseline at two instances. The one-instance `LOCAL_LOCK` runs have no matching baseline and can only read PASS or FAIL, which is why `LOCAL_LOCK` at one instance passes at a throughput that would mark `PESSIMISTIC` degraded.
+
+<details>
+<summary><b>oversell = NONE</b> — no defense: read the counter, sleep, write it back (6)</summary>
+
+**doubleBooking=NONE · cacheConsistency=NONE** → FAIL
+
+![none-none-none-2app FAIL](docs/cases/none-none-none-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=TTL_SHORT** → FAIL
+
+![none-none-ttl_short-2app FAIL](docs/cases/none-none-ttl_short-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
+
+![none-none-invalidate_on_write-2app FAIL](docs/cases/none-none-invalidate_on_write-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE** → FAIL
+
+![none-unique_constraint-none-2app FAIL](docs/cases/none-unique_constraint-none-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT** → FAIL
+
+![none-unique_constraint-ttl_short-2app FAIL](docs/cases/none-unique_constraint-ttl_short-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
+
+![none-unique_constraint-invalidate_on_write-2app FAIL](docs/cases/none-unique_constraint-invalidate_on_write-2app.png)
+
+</details>
+
+<details>
+<summary><b>oversell = LOCAL_LOCK</b> — a JVM `ReentrantLock`, at one instance and at two (12)</summary>
+
+**doubleBooking=NONE · cacheConsistency=NONE · appInstances=1** → FAIL
+
+![local_lock-none-none-1app FAIL](docs/cases/local_lock-none-none-1app.png)
+
+**doubleBooking=NONE · cacheConsistency=NONE · appInstances=2** → FAIL
+
+![local_lock-none-none-2app FAIL](docs/cases/local_lock-none-none-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=TTL_SHORT · appInstances=1** → FAIL
+
+![local_lock-none-ttl_short-1app FAIL](docs/cases/local_lock-none-ttl_short-1app.png)
+
+**doubleBooking=NONE · cacheConsistency=TTL_SHORT · appInstances=2** → FAIL
+
+![local_lock-none-ttl_short-2app FAIL](docs/cases/local_lock-none-ttl_short-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE · appInstances=1** → FAIL
+
+![local_lock-none-invalidate_on_write-1app FAIL](docs/cases/local_lock-none-invalidate_on_write-1app.png)
+
+**doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE · appInstances=2** → FAIL
+
+![local_lock-none-invalidate_on_write-2app FAIL](docs/cases/local_lock-none-invalidate_on_write-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE · appInstances=1** → PASS
+
+![local_lock-unique_constraint-none-1app PASS](docs/cases/local_lock-unique_constraint-none-1app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE · appInstances=2** → FAIL
+
+![local_lock-unique_constraint-none-2app FAIL](docs/cases/local_lock-unique_constraint-none-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT · appInstances=1** → PASS
+
+![local_lock-unique_constraint-ttl_short-1app PASS](docs/cases/local_lock-unique_constraint-ttl_short-1app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT · appInstances=2** → FAIL
+
+![local_lock-unique_constraint-ttl_short-2app FAIL](docs/cases/local_lock-unique_constraint-ttl_short-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE · appInstances=1** → PASS
+
+![local_lock-unique_constraint-invalidate_on_write-1app PASS](docs/cases/local_lock-unique_constraint-invalidate_on_write-1app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE · appInstances=2** → FAIL
+
+![local_lock-unique_constraint-invalidate_on_write-2app FAIL](docs/cases/local_lock-unique_constraint-invalidate_on_write-2app.png)
+
+</details>
+
+<details>
+<summary><b>oversell = CONDITIONAL_UPDATE</b> — `UPDATE ... WHERE remaining > 0`, one statement (6)</summary>
+
+**doubleBooking=NONE · cacheConsistency=NONE** → FAIL
+
+![conditional_update-none-none-2app FAIL](docs/cases/conditional_update-none-none-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=TTL_SHORT** → FAIL
+
+![conditional_update-none-ttl_short-2app FAIL](docs/cases/conditional_update-none-ttl_short-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
+
+![conditional_update-none-invalidate_on_write-2app FAIL](docs/cases/conditional_update-none-invalidate_on_write-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE** → PASS
+
+![conditional_update-unique_constraint-none-2app PASS](docs/cases/conditional_update-unique_constraint-none-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT** → PASS
+
+![conditional_update-unique_constraint-ttl_short-2app PASS](docs/cases/conditional_update-unique_constraint-ttl_short-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE** → PASS
+
+![conditional_update-unique_constraint-invalidate_on_write-2app PASS](docs/cases/conditional_update-unique_constraint-invalidate_on_write-2app.png)
+
+</details>
+
+<details>
+<summary><b>oversell = PESSIMISTIC</b> — `SELECT ... FOR UPDATE` inside a transaction (6)</summary>
+
+**doubleBooking=NONE · cacheConsistency=NONE** → FAIL
+
+![pessimistic-none-none-2app FAIL](docs/cases/pessimistic-none-none-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=TTL_SHORT** → FAIL
+
+![pessimistic-none-ttl_short-2app FAIL](docs/cases/pessimistic-none-ttl_short-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
+
+![pessimistic-none-invalidate_on_write-2app FAIL](docs/cases/pessimistic-none-invalidate_on_write-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE** → DEGRADED
+
+![pessimistic-unique_constraint-none-2app DEGRADED](docs/cases/pessimistic-unique_constraint-none-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT** → DEGRADED
+
+![pessimistic-unique_constraint-ttl_short-2app DEGRADED](docs/cases/pessimistic-unique_constraint-ttl_short-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE** → DEGRADED
+
+![pessimistic-unique_constraint-invalidate_on_write-2app DEGRADED](docs/cases/pessimistic-unique_constraint-invalidate_on_write-2app.png)
+
+</details>
+
+<details>
+<summary><b>oversell = OPTIMISTIC</b> — a version check with unbounded retry (6)</summary>
+
+**doubleBooking=NONE · cacheConsistency=NONE** → FAIL
+
+![optimistic-none-none-2app FAIL](docs/cases/optimistic-none-none-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=TTL_SHORT** → FAIL
+
+![optimistic-none-ttl_short-2app FAIL](docs/cases/optimistic-none-ttl_short-2app.png)
+
+**doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
+
+![optimistic-none-invalidate_on_write-2app FAIL](docs/cases/optimistic-none-invalidate_on_write-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE** → DEGRADED
+
+![optimistic-unique_constraint-none-2app DEGRADED](docs/cases/optimistic-unique_constraint-none-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT** → DEGRADED
+
+![optimistic-unique_constraint-ttl_short-2app DEGRADED](docs/cases/optimistic-unique_constraint-ttl_short-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE** → DEGRADED
+
+![optimistic-unique_constraint-invalidate_on_write-2app DEGRADED](docs/cases/optimistic-unique_constraint-invalidate_on_write-2app.png)
+
+</details>
+
+<details>
+<summary><b>cacheConsistency = REDIS_AS_SOT</b> — the counter lives in Redis and `DECR` decides, so the oversell strategy is ignored (2)</summary>
+
+**doubleBooking=NONE** → FAIL
+
+![none-none-redis_as_sot-2app FAIL](docs/cases/none-none-redis_as_sot-2app.png)
+
+**doubleBooking=UNIQUE_CONSTRAINT** → PASS
+
+![none-unique_constraint-redis_as_sot-2app PASS](docs/cases/none-unique_constraint-redis_as_sot-2app.png)
+
+</details>
+
 ## Running it
 
 You need JDK 21 and Docker.
@@ -69,6 +259,7 @@ docker compose up -d --build
 open http://localhost:8080      # parameter form and results
 ./scripts/dod.sh                # reproduces the tables above
 ./scripts/demo-gif.sh           # re-records docs/demo.gif (needs Node and ffmpeg)
+./scripts/case-shots.sh         # re-records docs/cases/*.png, one per combination (needs Node)
 ```
 
 `./gradlew test` runs the unit tests and `node --test src/test/js/ui.test.mjs` the UI functions, both without Docker.
