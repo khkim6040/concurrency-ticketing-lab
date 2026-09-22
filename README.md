@@ -75,21 +75,31 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 
 ![none-none-none-2app FAIL](docs/cases/none-none-none-2app.png)
 
+---
+
 **doubleBooking=NONE · cacheConsistency=TTL_SHORT** → FAIL
 
 ![none-none-ttl_short-2app FAIL](docs/cases/none-none-ttl_short-2app.png)
+
+---
 
 **doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
 
 ![none-none-invalidate_on_write-2app FAIL](docs/cases/none-none-invalidate_on_write-2app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE** → FAIL
 
 ![none-unique_constraint-none-2app FAIL](docs/cases/none-unique_constraint-none-2app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT** → FAIL
 
 ![none-unique_constraint-ttl_short-2app FAIL](docs/cases/none-unique_constraint-ttl_short-2app.png)
+
+---
 
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
 
@@ -104,45 +114,67 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 
 ![local_lock-none-none-1app FAIL](docs/cases/local_lock-none-none-1app.png)
 
+---
+
 **doubleBooking=NONE · cacheConsistency=NONE · appInstances=2** → FAIL
 
 ![local_lock-none-none-2app FAIL](docs/cases/local_lock-none-none-2app.png)
+
+---
 
 **doubleBooking=NONE · cacheConsistency=TTL_SHORT · appInstances=1** → FAIL
 
 ![local_lock-none-ttl_short-1app FAIL](docs/cases/local_lock-none-ttl_short-1app.png)
 
+---
+
 **doubleBooking=NONE · cacheConsistency=TTL_SHORT · appInstances=2** → FAIL
 
 ![local_lock-none-ttl_short-2app FAIL](docs/cases/local_lock-none-ttl_short-2app.png)
+
+---
 
 **doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE · appInstances=1** → FAIL
 
 ![local_lock-none-invalidate_on_write-1app FAIL](docs/cases/local_lock-none-invalidate_on_write-1app.png)
 
+---
+
 **doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE · appInstances=2** → FAIL
 
 ![local_lock-none-invalidate_on_write-2app FAIL](docs/cases/local_lock-none-invalidate_on_write-2app.png)
+
+---
 
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE · appInstances=1** → PASS
 
 ![local_lock-unique_constraint-none-1app PASS](docs/cases/local_lock-unique_constraint-none-1app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE · appInstances=2** → FAIL
 
 ![local_lock-unique_constraint-none-2app FAIL](docs/cases/local_lock-unique_constraint-none-2app.png)
+
+---
 
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT · appInstances=1** → PASS
 
 ![local_lock-unique_constraint-ttl_short-1app PASS](docs/cases/local_lock-unique_constraint-ttl_short-1app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT · appInstances=2** → FAIL
 
 ![local_lock-unique_constraint-ttl_short-2app FAIL](docs/cases/local_lock-unique_constraint-ttl_short-2app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE · appInstances=1** → PASS
 
 ![local_lock-unique_constraint-invalidate_on_write-1app PASS](docs/cases/local_lock-unique_constraint-invalidate_on_write-1app.png)
+
+---
 
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE · appInstances=2** → FAIL
 
@@ -157,21 +189,31 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 
 ![conditional_update-none-none-2app FAIL](docs/cases/conditional_update-none-none-2app.png)
 
+---
+
 **doubleBooking=NONE · cacheConsistency=TTL_SHORT** → FAIL
 
 ![conditional_update-none-ttl_short-2app FAIL](docs/cases/conditional_update-none-ttl_short-2app.png)
+
+---
 
 **doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
 
 ![conditional_update-none-invalidate_on_write-2app FAIL](docs/cases/conditional_update-none-invalidate_on_write-2app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE** → PASS
 
 ![conditional_update-unique_constraint-none-2app PASS](docs/cases/conditional_update-unique_constraint-none-2app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT** → PASS
 
 ![conditional_update-unique_constraint-ttl_short-2app PASS](docs/cases/conditional_update-unique_constraint-ttl_short-2app.png)
+
+---
 
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE** → PASS
 
@@ -186,21 +228,31 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 
 ![pessimistic-none-none-2app FAIL](docs/cases/pessimistic-none-none-2app.png)
 
+---
+
 **doubleBooking=NONE · cacheConsistency=TTL_SHORT** → FAIL
 
 ![pessimistic-none-ttl_short-2app FAIL](docs/cases/pessimistic-none-ttl_short-2app.png)
+
+---
 
 **doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
 
 ![pessimistic-none-invalidate_on_write-2app FAIL](docs/cases/pessimistic-none-invalidate_on_write-2app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE** → DEGRADED
 
 ![pessimistic-unique_constraint-none-2app DEGRADED](docs/cases/pessimistic-unique_constraint-none-2app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT** → DEGRADED
 
 ![pessimistic-unique_constraint-ttl_short-2app DEGRADED](docs/cases/pessimistic-unique_constraint-ttl_short-2app.png)
+
+---
 
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE** → DEGRADED
 
@@ -215,21 +267,31 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 
 ![optimistic-none-none-2app FAIL](docs/cases/optimistic-none-none-2app.png)
 
+---
+
 **doubleBooking=NONE · cacheConsistency=TTL_SHORT** → FAIL
 
 ![optimistic-none-ttl_short-2app FAIL](docs/cases/optimistic-none-ttl_short-2app.png)
+
+---
 
 **doubleBooking=NONE · cacheConsistency=INVALIDATE_ON_WRITE** → FAIL
 
 ![optimistic-none-invalidate_on_write-2app FAIL](docs/cases/optimistic-none-invalidate_on_write-2app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=NONE** → DEGRADED
 
 ![optimistic-unique_constraint-none-2app DEGRADED](docs/cases/optimistic-unique_constraint-none-2app.png)
 
+---
+
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=TTL_SHORT** → DEGRADED
 
 ![optimistic-unique_constraint-ttl_short-2app DEGRADED](docs/cases/optimistic-unique_constraint-ttl_short-2app.png)
+
+---
 
 **doubleBooking=UNIQUE_CONSTRAINT · cacheConsistency=INVALIDATE_ON_WRITE** → DEGRADED
 
@@ -243,6 +305,8 @@ Each group runs its `oversell=NONE` case first, so the `DEGRADED` check has a ba
 **doubleBooking=NONE** → FAIL
 
 ![none-none-redis_as_sot-2app FAIL](docs/cases/none-none-redis_as_sot-2app.png)
+
+---
 
 **doubleBooking=UNIQUE_CONSTRAINT** → PASS
 
