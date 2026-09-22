@@ -1,14 +1,12 @@
 # M2 중복 배정 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** 좌석 단위 예약(`reservation` 테이블), 실행 시작 시 켜고 끄는 유니크 인덱스, `doubleBookedSeats`·`duplicateKeyCount` 지표, 그리드의 빨강 셀을 추가해 "유니크 OFF에서 중복 배정 재현, ON에서 0건 + 중복키 카운트 노출"이 화면에서 보이게 한다.
 
 **Architecture:** M1 구조 그대로. 한 요청은 **좌석 단계**(`reservation` INSERT, `doubleBooking` 전략) → **카운터 단계**(`event.remaining` 차감, 기존 `oversell` 전략) 순서로 진행하고, 카운터가 OK가 아니면 자기 행을 DELETE로 되돌린다. web은 실행 시작 시 `TRUNCATE` 후 유니크 인덱스를 원하는 상태로 맞추고, `Random(seed)`로 좌석을 미리 뽑아 보내며, 실행 후 DB에서 중복 좌석 수를 직접 센다.
 
 **Tech Stack:** Kotlin 2.2, JDK 21, Spring Boot 3.5 (web, jdbc), MySQL 8.4, Docker Compose.
 
-**Spec:** `docs/superpowers/specs/2026-09-20-m2-design.md` (결정 근거 `docs/decisions.md`)
+**Spec:** `docs/milestones/specs/2026-09-20-m2-design.md` (결정 근거 `docs/decisions.md`)
 
 ## Global Constraints
 
@@ -585,7 +583,7 @@ git commit -m "feat: add doubleBooking radio and red cells for double-booked sea
 - Modify: `scripts/dod.sh`
 - Modify: `docs/decisions.md`
 - Modify: `README.md`
-- Modify: `docs/superpowers/plans/2026-09-20-m2-double-booking.md` (체크박스)
+- Modify: `docs/milestones/plans/2026-09-20-m2-double-booking.md` (체크박스)
 
 **Interfaces:**
 - Consumes: 전체
@@ -657,7 +655,7 @@ Expected:
 - 기존 M1 표 아래에 Step 2 출력에서 뽑은 M2 표를 추가한다. 열: `Oversell | Double booking | Verdict | Oversold | Ledger | Double booked | Dup keys | Throughput (req/s) | p99`. 2행. 값은 실측치 범위. 표 아래에 두 문장: `CONDITIONAL_UPDATE` alone keeps the count right and still fails because seats overlap, and the unique index is the only layer that rejects the second reservation regardless of what the code above it did.
 - M1 표는 Step 2의 M1 구간 실측치로 갱신한다(좌석 NONE 경로가 추가되어 수치가 바뀜). 표 위 문장에 `doubleBooking=NONE`을 명시하고, 판정 열은 `dup`으로 인한 FAIL을 그대로 적되 `Oversold`·`Ledger`가 0임을 보이도록 `Ledger` 열을 추가한다.
 - 로드맵 M2 항목을 `- [x] M2 Double booking. \`reservation\` table, unique index toggled at runtime`으로 바꾼다.
-- `## Documents`에 `- [M2 design](docs/superpowers/specs/2026-09-20-m2-design.md) and [M2 implementation plan](docs/superpowers/plans/2026-09-20-m2-double-booking.md) (Korean)` 줄을 추가한다.
+- `## Documents`에 `- [M2 design](docs/milestones/specs/2026-09-20-m2-design.md) and [M2 implementation plan](docs/milestones/plans/2026-09-20-m2-double-booking.md) (Korean)` 줄을 추가한다.
 - `## How it is put together`의 파일 목록 설명 `app/ReservationService.kt one SQL path per strategy`를 `app/ReservationService.kt seat step, then one SQL path per counter strategy`로 바꾼다.
 - `## API` 예시 요청 본문의 `"strategies": { "oversell": "NONE" }`을 `"strategies": { "oversell": "NONE", "doubleBooking": "NONE" }`으로 바꾼다.
 
@@ -677,6 +675,6 @@ git commit -m "docs: record M2 results and mark roadmap"
 이 문서의 `- [ ]`를 모두 `- [x]`로 바꾼다.
 
 ```bash
-git add docs/superpowers/plans/2026-09-20-m2-double-booking.md
+git add docs/milestones/plans/2026-09-20-m2-double-booking.md
 git commit -m "docs: mark M2 plan as done"
 ```

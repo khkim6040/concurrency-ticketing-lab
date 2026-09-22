@@ -1,14 +1,12 @@
 # M3 캐시 계층 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Redis 잔여석 캐시와 조회 경로(`GET /api/stock`), 캐시 전략 4종(`NONE` / `TTL_SHORT` / `INVALIDATE_ON_WRITE` / `REDIS_AS_SOT`), 전용 조회자가 측정하는 `phantomStockViews`·`staleWindowMs`를 추가하고, "어떤 전략도 stale을 0으로 만들지 못한다"를 UI가 설명하게 한다.
 
 **Architecture:** M2 구조 그대로. 앱에 `StockCache`(키 `stock:{eventId}`)가 들어와 조회 경로를 담당한다. cache-aside 셋은 미스 때 DB 읽기 → `sleep(raceWindowMs)` → `SET` 순서라 삭제-재적재 경합이 재현된다. `REDIS_AS_SOT`는 카운터 단계를 Redis `DECR`로 바꾸고 `oversell` 전략을 무시한다. web은 조회자 2개를 10ms 간격으로 돌리고, 100번째 `OK` 응답 시각을 `soldOutAt`으로 잡아 그 뒤 `remaining > 0` 응답을 phantom으로 센다. 판정은 M2 그대로다.
 
 **Tech Stack:** Kotlin 2.2, JDK 21, Spring Boot 3.5 (web, jdbc, data-redis), MySQL 8.4, Redis 7, Docker Compose.
 
-**Spec:** `docs/superpowers/specs/2026-09-20-m3-design.md` (결정 근거 `docs/decisions.md`)
+**Spec:** `docs/milestones/specs/2026-09-20-m3-design.md` (결정 근거 `docs/decisions.md`)
 
 ## Global Constraints
 
@@ -771,7 +769,7 @@ git commit -m "feat: add cacheConsistency radio, live viewer stock line and stal
 - Modify: `scripts/dod.sh`
 - Modify: `docs/decisions.md`
 - Modify: `README.md`
-- Modify: `docs/superpowers/plans/2026-09-20-m3-cache-layer.md` (체크박스)
+- Modify: `docs/milestones/plans/2026-09-20-m3-cache-layer.md` (체크박스)
 
 **Interfaces:**
 - Consumes: 전체
@@ -858,7 +856,7 @@ Expected:
 - `## API` 예시 요청 본문의 `"strategies": { "oversell": "NONE", "doubleBooking": "NONE" }`을 `"strategies": { "oversell": "NONE", "doubleBooking": "NONE", "cacheConsistency": "NONE" }`으로 바꾼다.
 - `## How it is put together`의 첫 문단 끝에 한 문장 추가: `Redis holds the stock cache under \`stock:{eventId}\`; under \`REDIS_AS_SOT\` it holds the counter itself.` 파일 목록에 `  app/StockCache.kt         stock:{eventId} read path, DECR counter, DEL on write` 줄을 `app/ReservationService.kt` 아래에 추가하고, `app/ReservationService.kt` 설명을 `seat step, then one SQL path per counter strategy, or DECR under REDIS_AS_SOT`로 바꾼다.
 - 로드맵 M3 항목을 `- [x] M3 Cache layer. Redis, four stale-read strategies, \`phantomStockViews\``로 바꾼다.
-- `## Documents`에 `- [M3 design](docs/superpowers/specs/2026-09-20-m3-design.md) and [M3 implementation plan](docs/superpowers/plans/2026-09-20-m3-cache-layer.md) (Korean)` 줄을 추가한다.
+- `## Documents`에 `- [M3 design](docs/milestones/specs/2026-09-20-m3-design.md) and [M3 implementation plan](docs/milestones/plans/2026-09-20-m3-cache-layer.md) (Korean)` 줄을 추가한다.
 - `## Running it`의 `You need JDK 21 and Docker.`는 그대로. `docker compose up -d --build` 설명에 Redis가 함께 뜬다는 말은 넣지 않는다(compose가 말한다).
 
 - [x] **Step 5: Commit**
@@ -877,6 +875,6 @@ git commit -m "docs: record M3 results and mark roadmap"
 이 문서의 `- [ ]`를 모두 `- [x]`로 바꾼다.
 
 ```bash
-git add docs/superpowers/plans/2026-09-20-m3-cache-layer.md
+git add docs/milestones/plans/2026-09-20-m3-cache-layer.md
 git commit -m "docs: mark M3 plan as done"
 ```

@@ -1,14 +1,12 @@
 # M1 전략 확장 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** `LOCAL_LOCK`/`PESSIMISTIC`/`OPTIMISTIC` 전략, 재시도·커넥션 피크 지표, DEGRADED 판정, 실행 중 칠해지는 좌석 그리드를 추가해 "`LOCAL_LOCK` + 앱 1대 PASS, 2대 FAIL"이 화면에서 보이게 한다.
 
 **Architecture:** M0 구조 그대로. 앱은 `ReservationService`의 `when` 분기를 늘리고 응답에 `retries`·`activeConnections`를 실어 보낸다. web은 `Progress` 카운터를 `RunState`에 넣어 200ms 폴링으로 그리드를 칠하고, 같은 파라미터의 최근 `NONE` 처리량을 메모리에 보관해 DEGRADED를 판정한다.
 
 **Tech Stack:** Kotlin 2.2, JDK 21, Spring Boot 3.5 (web, jdbc, `TransactionTemplate`, HikariCP), MySQL 8.4, Docker Compose.
 
-**Spec:** `docs/superpowers/specs/2026-09-20-m1-design.md` (결정 근거 `docs/decisions.md`)
+**Spec:** `docs/milestones/specs/2026-09-20-m1-design.md` (결정 근거 `docs/decisions.md`)
 
 ## Global Constraints
 
@@ -619,7 +617,7 @@ Expected:
   - `- A seat grid that fills in while the run is in flight, polled every 200 ms. Green is a sold seat, orange is a seat sold past capacity.`
 - 기존 결과 표 아래에 Step 2 출력에서 뽑은 M1 표를 추가한다. 열: `Strategy | Apps | Verdict | Oversold | Throughput (req/s) | p99 | Retries | Conn peak`. 10행(5전략 × 1/2대). 값은 실측치 범위.
 - 로드맵의 M1 항목을 `- [x]`로 바꾼다.
-- `## Documents`에 `[M1 design](docs/superpowers/specs/2026-09-20-m1-design.md) and [M1 implementation plan](docs/superpowers/plans/2026-09-20-m1-strategies.md) (Korean)` 줄을 추가한다.
+- `## Documents`에 `[M1 design](docs/milestones/specs/2026-09-20-m1-design.md) and [M1 implementation plan](docs/milestones/plans/2026-09-20-m1-strategies.md) (Korean)` 줄을 추가한다.
 
 - [x] **Step 4: Commit**
 

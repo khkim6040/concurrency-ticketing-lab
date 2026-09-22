@@ -1,14 +1,12 @@
 # M4 비교·공유·해설 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** 시드와 파라미터를 담은 공유 링크, 직전 실행과의 비교 표, 전략 11종의 접이식 해설(영어 기본·한국어 토글), 데모 GIF와 README를 추가한다. 서버 로직은 바뀌지 않는다.
 
 **Architecture:** UI의 순수 함수(링크 직렬화, 비교 행, 판정 이유, 문자열 사전)를 ES 모듈 `static/lib.js`로 빼고 `index.html`은 `<script type="module">`로 불러온다. 같은 파일을 `node --test`가 import한다. 공유 링크는 `RunSpec` 여덟 키의 쿼리스트링이고, 페이지를 열 때 있으면 폼을 채워 자동 실행한다. 비교는 브라우저가 직전 리포트를 변수로 기억한다. 정적 텍스트는 `<span lang="en">`/`<span lang="ko">` 쌍과 CSS 두 줄로, 동적 텍스트는 사전 `T`로 언어를 바꾼다. GIF는 Playwright `recordVideo`로 녹화하고 `ffmpeg`로 변환한다.
 
 **Tech Stack:** 브라우저 ES 모듈(빌드 없음), Node 22 `node:test`, Playwright(GIF 생성 시에만 임시 설치), ffmpeg. 서버는 Kotlin/Spring Boot 그대로.
 
-**Spec:** `docs/superpowers/specs/2026-09-21-m4-design.md` (결정 근거 `docs/decisions.md`)
+**Spec:** `docs/milestones/specs/2026-09-21-m4-design.md` (결정 근거 `docs/decisions.md`)
 
 ## Global Constraints
 
@@ -628,7 +626,7 @@ git commit -m "feat: add demo GIF recorder and the recorded demo"
 
 **Files:**
 - Modify: `README.md`
-- Modify: `docs/superpowers/plans/2026-09-21-m4-compare-share.md` (체크박스)
+- Modify: `docs/milestones/plans/2026-09-21-m4-compare-share.md` (체크박스)
 
 - [x] **Step 1: README 갱신**
 
@@ -681,7 +679,7 @@ http://localhost:8080/?seatCount=100&userCount=1000&appInstances=2&raceWindowMs=
 6. 문서 목록 끝에:
 
 ```markdown
-- [M4 design](docs/superpowers/specs/2026-09-21-m4-design.md) and [M4 implementation plan](docs/superpowers/plans/2026-09-21-m4-compare-share.md) (Korean)
+- [M4 design](docs/milestones/specs/2026-09-21-m4-design.md) and [M4 implementation plan](docs/milestones/plans/2026-09-21-m4-compare-share.md) (Korean)
 ```
 
 - [x] **Step 2: 계획 체크박스**
@@ -691,6 +689,6 @@ http://localhost:8080/?seatCount=100&userCount=1000&appInstances=2&raceWindowMs=
 - [x] **Step 3: 커밋**
 
 ```bash
-git add README.md docs/superpowers/plans/2026-09-21-m4-compare-share.md
+git add README.md docs/milestones/plans/2026-09-21-m4-compare-share.md
 git commit -m "docs: describe M4 in the README and mark the roadmap"
 ```
